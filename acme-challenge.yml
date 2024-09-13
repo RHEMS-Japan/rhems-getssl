@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: acme-challenge
+data:
+  abcdefghijklmnopqrstuvwxyz: |
+    abcdefghijklmnopqrstuvwxyz.0123456789_-

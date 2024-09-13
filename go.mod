@@ -1,3 +1,3 @@
-module test-getssl
+module main
 
 go 1.22
