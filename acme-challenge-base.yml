@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: acme-challenge
+data:
+  __FILE_NAME__: |
+    __CONTENT__

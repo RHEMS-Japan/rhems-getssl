@@ -4,7 +4,7 @@ kind: Kustomization
 namespace: yutaro-test
 
 resources:
-#  - job.yml
+  - job.yml
 #  - deployment.yml
 #  - _env.yml
   - go.yml
@@ -12,6 +12,7 @@ resources:
   - ingress.yml
   - file-name.yml
   - acme-challenge.yml
+  - rbac.yml
 
 configMapGenerator:
   - name: test-conf
@@ -20,9 +21,18 @@ configMapGenerator:
   - name: create-cert-sh
     files:
       - create-cert.sh
+  - name: create-cert-auto-sh
+    files:
+      - create-cert-auto.sh
   - name: init-sh
     files:
       - init.sh
   - name: server-go
     files:
       - server.go
+  - name: acme-challenge-base
+    files:
+      - acme-challenge-base.yml
+  - name: file-name-base
+    files:
+      - file-name-base.yml

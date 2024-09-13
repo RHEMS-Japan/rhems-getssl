@@ -17,17 +17,17 @@ spec:
         karpenter.sh/provisioner-name: spondemand-amd64
       containers:
         - name: test-getssl-go
-          image: golang:1.23.1-alpine3.19
+          image: 063150541913.dkr.ecr.ap-northeast-1.amazonaws.com/rhems-getssl@sha256:fd087330f0047066f8433dac868a9b7326eff070592a2d5d5f0868e37f449ab3
           imagePullPolicy: IfNotPresent
           workingDir: /root
-          command: ["go", "run", "/root/server.go"]
+          command: ["/root/server"]
           resources:
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 10m
+              memory: 10Mi
             requests:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 10m
+              memory: 10Mi
           env:
             - name: TZ
               value: Asia/Tokyo
@@ -40,6 +40,24 @@ spec:
             - containerPort: 80
               name: http
               protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+            successThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 60
+            timeoutSeconds: 3
+            failureThreshold: 1
+            successThreshold: 1
           volumeMounts:
             - name: server-go
               mountPath: /root/server.go

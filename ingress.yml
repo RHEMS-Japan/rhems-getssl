@@ -16,7 +16,7 @@ spec:
   rules:
     - http:
         paths:
-          - path: /*
+          - path: /.well-known/acme-challenge/*
             pathType: ImplementationSpecific
             backend:
               service:

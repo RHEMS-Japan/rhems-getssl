@@ -1,23 +1,21 @@
-apiVersion: apps/v1
+apiVersion: batch/v1
 kind: Job
 metadata:
   name: test-getssl
   labels:
     app: test-getssl
 spec:
-  selector:
-    matchLabels:
-      app: test-getssl
   template:
     metadata:
       labels:
         app: test-getssl
     spec:
+      serviceAccountName: getssl-job
       nodeSelector:
         karpenter.sh/provisioner-name: spondemand-amd64
       initContainers:
         - name: init-getssl
-          image: 063150541913.dkr.ecr.ap-northeast-1.amazonaws.com/test-getssl@sha256:7aa09061a8d52b8327e09688b1eeeeb75a641cd3b9199275aad2cee7ab25cae4
+          image: 063150541913.dkr.ecr.ap-northeast-1.amazonaws.com/rhems-getssl@sha256:fde314e4262ff5370082da8c470a2b7b58ddbaae8653e1aca6b87f69cef0ca36
           imagePullPolicy: IfNotPresent
           workingDir: /tmp
           command:
@@ -38,10 +36,10 @@ spec:
               subPath: init.sh
       containers:
         - name: test-getssl
-          image: 063150541913.dkr.ecr.ap-northeast-1.amazonaws.com/test-getssl@sha256:7aa09061a8d52b8327e09688b1eeeeb75a641cd3b9199275aad2cee7ab25cae4
+          image: 063150541913.dkr.ecr.ap-northeast-1.amazonaws.com/rhems-getssl@sha256:fde314e4262ff5370082da8c470a2b7b58ddbaae8653e1aca6b87f69cef0ca36
           imagePullPolicy: IfNotPresent
           workingDir: /root
-          command: ["nginx", "-g", "daemon off;", "-c", "/etc/nginx/nginx.conf"]
+          command: ["./create-cert-auto.sh", "test-getssl.rhems-labs.org", "yutaro-test"]
           resources:
             limits:
               cpu: 250m
@@ -60,41 +58,37 @@ spec:
               name: http
               protocol: TCP
           volumeMounts:
-            - name: test-conf
-              mountPath: /etc/nginx/conf.d/test.conf
-              subPath: test.conf
-            - name: index-html
-              mountPath: /var/www/html/index.html
-              subPath: index.html
-            - name: create-cert-sh
-              mountPath: /root/create-cert.sh
-              subPath: create-cert.sh
+            - name: create-cert-auto-sh
+              mountPath: /root/create-cert-auto.sh
+              subPath: create-cert-auto.sh
+            - name: acme-challenge-base
+              mountPath: /root/acme-challenge-base.yml
+              subPath: acme-challenge-base.yml
+            - name: file-name-base
+              mountPath: /root/file-name-base.yml
+              subPath: file-name-base.yml
             - name: root
               mountPath: /root
-            - name: acme-challenge
-              mountPath: /var/www/html/.well-known/acme-challenge
       volumes:
-        - name: test-conf
+        - name: create-cert-auto-sh
           configMap:
-            name: test-conf
-            defaultMode: 0755
-        - name: index-html
-          configMap:
-            name: index-html
-            defaultMode: 0755
-        - name: create-cert-sh
-          configMap:
-            name: create-cert-sh
+            name: create-cert-auto-sh
             defaultMode: 0755
         - name: init-sh
           configMap:
             name: init-sh
             defaultMode: 0755
-        - name: acme-challenge
-          emptyDir: {}
+        - name: acme-challenge-base
+          configMap:
+            name: acme-challenge-base
+            defaultMode: 0755
+        - name: file-name-base
+          configMap:
+            name: file-name-base
+            defaultMode: 0755
         - name: root
           emptyDir: {}
       restartPolicy: Never
-    backoffLimit: 4
+  backoffLimit: 4
 
 
