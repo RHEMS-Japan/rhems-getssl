@@ -1,16 +1,10 @@
 FROM alpine:3.20.3
 
-RUN apk add --no-cache bind-tools jq unzip sudo curl bash openssl
+RUN apk add --no-cache bind-tools jq unzip sudo curl bash openssl aws-cli
 
 WORKDIR /tmp/getssl
 
 RUN curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl ; chmod 700 getssl
-
-WORKDIR /tmp/awscli
-
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-RUN unzip awscliv2.zip
-RUN sudo ./aws/install
 
 WORKDIR /tmp/kubectl
 

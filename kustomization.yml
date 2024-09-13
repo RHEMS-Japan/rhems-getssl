@@ -6,12 +6,10 @@ namespace: yutaro-test
 resources:
   - job.yml
 #  - deployment.yml
-#  - _env.yml
+  - _env.yml
   - go.yml
   - svc.yml
   - ingress.yml
-  - file-name.yml
-  - acme-challenge.yml
   - rbac.yml
 
 configMapGenerator:
