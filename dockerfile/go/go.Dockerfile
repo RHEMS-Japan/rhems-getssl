@@ -4,6 +4,7 @@ RUN mkdir -p /root
 
 WORKDIR /root
 
+# build the server
 COPY server.go /root/server.go
 COPY go.mod /root/go.mod
 RUN go mod download

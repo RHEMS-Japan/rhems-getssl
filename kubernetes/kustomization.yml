@@ -5,7 +5,6 @@ namespace: yutaro-test
 
 resources:
   - job.yml
-#  - deployment.yml
   - _env.yml
   - go.yml
   - svc.yml
@@ -13,21 +12,12 @@ resources:
   - rbac.yml
 
 configMapGenerator:
-  - name: test-conf
-    files:
-      - test.conf
-  - name: create-cert-sh
-    files:
-      - create-cert.sh
   - name: create-cert-auto-sh
     files:
       - create-cert-auto.sh
   - name: init-sh
     files:
       - init.sh
-  - name: server-go
-    files:
-      - server.go
   - name: acme-challenge-base
     files:
       - acme-challenge-base.yml

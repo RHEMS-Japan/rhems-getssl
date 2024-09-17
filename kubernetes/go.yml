@@ -59,16 +59,9 @@ spec:
             failureThreshold: 1
             successThreshold: 1
           volumeMounts:
-            - name: server-go
-              mountPath: /root/server.go
-              subPath: server.go
             - name: acme-challenge
               mountPath: /root/acme-challenge
       volumes:
-        - name: server-go
-          configMap:
-            name: server-go
-            defaultMode: 0755
         - name: acme-challenge
           configMap:
             name: acme-challenge
