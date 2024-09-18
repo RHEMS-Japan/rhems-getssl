@@ -115,6 +115,8 @@ if cat getssl.log | grep -qE 'Certificate saved in' ; then
 
     _cert_secret_name=$(kubectl get secrets -n "${POD_NAMESPACE}" -o json | jq -r '.items[].metadata.name' | grep -e '^certificate-[a-z,0-9]*')
     kubectl patch secret -n "${POD_NAMESPACE}" "${_cert_secret_name}" -p '{"data":{"qcloud_cert_id":"'"${_log}"'"}}'
+
+    _log="update qcloud_cert_id in secret. Namespace: ${POD_NAMESPACE}, secret name: ${_cert_secret_name}"
   fi
   curl -X POST -H "Content-Type: application/json" \
       https://badges.rhems-japan.com/api-update-badge \
@@ -129,7 +131,7 @@ if cat getssl.log | grep -qE 'Certificate saved in' ; then
             "slack_failed": "rhems-debug",
             "slack_success": "rhems-debug",
             "msg": "certificate created successfully.",
-            "log": "'$(cat getssl.log | jq -r '.CertificateArn' | jq -sRr @uri)'"
+            "log": "'"${_log}"'"
           }'
     exit 0
 fi
