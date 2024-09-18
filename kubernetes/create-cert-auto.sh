@@ -73,6 +73,7 @@ done
 
 ./getssl -f "${_domain}" 2>&1 | tee -a getssl.log
 
+# cronjobにした場合下記
 if cat getssl.log | grep -qE 'for some reason could not reach' ; then
   echo "Failed to create certificate"
   echo '' >> getssl.log
@@ -81,15 +82,18 @@ if cat getssl.log | grep -qE 'for some reason could not reach' ; then
   curl -X POST -H "Content-Type: application/json" \
     https://badges.rhems-japan.com/api-update-badge \
     -d '{
-          "api_token": "3985791f-3343-45d3-80e5-3fc4c7c6d477",
-          "organization": "yutaro-test",
-          "repo": "test-getssl",
-          "app": "test-getssl",
-          "branch": "test",
+          "api_token": "'"${API_TOKEN}"'",
+          "organization": "'"${ORGANIZATION}"'",
+          "repo": "'"${REPO}"'",
+          "app": "'"${APP}"'",
+          "branch": "'"${BRANCH}"'",
           "status": false,
           "update": "'$(date +%Y-%m-%d-%H-%M-%S)'",
-          "slack_failed": "rhems-debug",
-          "slack_success": "rhems-debug",
+          "update": "'$(date +%Y-%m-%d-%H-%M-%S)'",
+          "cronjob": "'"${CRON}"'",
+          "grace_time": '"${GRACE_TIME}"',
+          "slack_failed": "'"${SLACK_FAILED}"'",
+          "slack_success": "'"${SLACK_SUCCESS}"'",
           "msg": "failed to validate file.",
           "log": "'$(cat getssl.log | tail -n 4 | jq -sRr @uri)'"
         }'
@@ -121,22 +125,23 @@ if cat getssl.log | grep -qE 'Certificate saved in' ; then
   curl -X POST -H "Content-Type: application/json" \
       https://badges.rhems-japan.com/api-update-badge \
       -d '{
-            "api_token": "3985791f-3343-45d3-80e5-3fc4c7c6d477",
-            "organization": "yutaro-test",
-            "repo": "test-getssl",
-            "app": "test-getssl",
-            "branch": "test",
+            "api_token": "'"${API_TOKEN}"'",
+            "organization": "'"${ORGANIZATION}"'",
+            "repo": "'"${REPO}"'",
+            "app": "'"${APP}"'",
+            "branch": "'"${BRANCH}"'",
             "status": true,
             "update": "'$(date +%Y-%m-%d-%H-%M-%S)'",
-            "slack_failed": "rhems-debug",
-            "slack_success": "rhems-debug",
+            "cronjob": "'"${CRON}"'",
+            "grace_time": '"${GRACE_TIME}"',
+            "slack_failed": "'"${SLACK_FAILED}"'",
+            "slack_success": "'"${SLACK_SUCCESS}"'",
             "msg": "certificate created successfully.",
             "log": "'"${_log}"'"
           }'
     exit 0
 fi
 
-## cronjobにした場合下記
 #if cat getssl.log | grep -qE 'for some reason could not reach' ; then
 #  echo "Failed to create certificate"
 #  echo '' >> getssl.log
@@ -145,18 +150,15 @@ fi
 #  curl -X POST -H "Content-Type: application/json" \
 #    https://badges.rhems-japan.com/api-update-badge \
 #    -d '{
-#          "api_token": "'"${API_TOKEN}"'",
-#          "organization": "'"${ORGANIZATION}"'",
-#          "repo": "'"${REPO}"'",
-#          "app": "'"${APP}"'",
-#          "branch": "'"${BRANCH}"'",
+#          "api_token": "3985791f-3343-45d3-80e5-3fc4c7c6d477",
+#          "organization": "yutaro-test",
+#          "repo": "test-getssl",
+#          "app": "test-getssl",
+#          "branch": "test",
 #          "status": false,
 #          "update": "'$(date +%Y-%m-%d-%H-%M-%S)'",
-#          "update": "'$(date +%Y-%m-%d-%H-%M-%S)'",
-#          "cronjob": "'"${CRON}"'",
-#          "grace_time": '"${GRACE_TIME}"',
-#          "slack_failed": "'"${SLACK_FAILED}"'",
-#          "slack_success": "'"${SLACK_SUCCESS}"'",
+#          "slack_failed": "rhems-debug",
+#          "slack_success": "rhems-debug",
 #          "msg": "failed to validate file.",
 #          "log": "'$(cat getssl.log | tail -n 4 | jq -sRr @uri)'"
 #        }'
@@ -167,23 +169,38 @@ fi
 #  echo "Certificate created successfully"
 #  echo "certificate upload to cert manager"
 #  cd /root/.getssl/"${_domain}"
-#  aws acm import-certificate --certificate fileb://"${_domain}".crt --certificate-chain fileb://chain.crt --private-key fileb://"${_domain}".key | tee -a getssl.log
+#  _log=""
+#  if [ "${CLOUD}" == "aws" ]; then
+#    echo "aws"
+#    aws acm import-certificate --certificate fileb://"${_domain}".crt --certificate-chain fileb://chain.crt --private-key fileb://"${_domain}".key | tee -a getssl.log
+#    _log=$(cat getssl.log | jq -r '.CertificateArn' | jq -sRr @uri)
+#  elif [ "${CLOUD}" == "tencent" ]; then
+#    echo "tencent"
+#    _alias="cert_$(date '+%Y%m%d%H%M%S')"
+#    _private_key=$(cat "${_domain}".key)
+#    _public_key=$(cat "${_domain}".crt)
+#    tccli ssl UploadCertificate --CertificatePublicKey "${_public_key}" --CertificatePrivateKey "${_private_key}" --CertificateType SVR --output json --Alias "${_alias}" | tee -a getssl.log
+#    _log=$(cat getssl.log | jq -r '.CertificateId' | jq -sRr @uri)
+#
+#    _cert_secret_name=$(kubectl get secrets -n "${POD_NAMESPACE}" -o json | jq -r '.items[].metadata.name' | grep -e '^certificate-[a-z,0-9]*')
+#    kubectl patch secret -n "${POD_NAMESPACE}" "${_cert_secret_name}" -p '{"data":{"qcloud_cert_id":"'"${_log}"'"}}'
+#
+#    _log="update qcloud_cert_id in secret. Namespace: ${POD_NAMESPACE}, secret name: ${_cert_secret_name}"
+#  fi
 #  curl -X POST -H "Content-Type: application/json" \
 #      https://badges.rhems-japan.com/api-update-badge \
 #      -d '{
-#            "api_token": "'"${API_TOKEN}"'",
-#            "organization": "'"${ORGANIZATION}"'",
-#            "repo": "'"${REPO}"'",
-#            "app": "'"${APP}"'",
-#            "branch": "'"${BRANCH}"'",
+#            "api_token": "3985791f-3343-45d3-80e5-3fc4c7c6d477",
+#            "organization": "yutaro-test",
+#            "repo": "test-getssl",
+#            "app": "test-getssl",
+#            "branch": "test",
 #            "status": true,
 #            "update": "'$(date +%Y-%m-%d-%H-%M-%S)'",
-#            "cronjob": "'"${CRON}"'",
-#            "grace_time": '"${GRACE_TIME}"',
-#            "slack_failed": "'"${SLACK_FAILED}"'",
-#            "slack_success": "'"${SLACK_SUCCESS}"'",
+#            "slack_failed": "rhems-debug",
+#            "slack_success": "rhems-debug",
 #            "msg": "certificate created successfully.",
-#            "log": "'$(cat getssl.log | jq -r '.CertificateArn' | jq -sRr @uri)'"
+#            "log": "'"${_log}"'"
 #          }'
 #    exit 0
 #fi

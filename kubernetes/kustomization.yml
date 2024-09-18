@@ -4,10 +4,11 @@ kind: Kustomization
 namespace: yutaro-test
 
 resources:
-  - job.yml
-#  - cronjob.yml
-  - _env.yml
-#  - env.yml
+#  - job.yml
+#  - _cronjob.yml
+  - cronjob.yml
+#  - _env.yml
+  - env.yml
   - go.yml
   - svc.yml
   - ingress.yml
