@@ -102,9 +102,11 @@ if cat getssl.log | grep -qE 'Certificate saved in' ; then
   cd /root/.getssl/"${_domain}"
   _log=""
   if [ "${CLOUD}" == "aws" ]; then
+    echo "aws"
     aws acm import-certificate --certificate fileb://"${_domain}".crt --certificate-chain fileb://chain.crt --private-key fileb://"${_domain}".key | tee -a getssl.log
     _log=$(cat getssl.log | jq -r '.CertificateArn' | jq -sRr @uri)
   elif [ "${CLOUD}" == "tencent" ]; then
+    echo "tencent"
     _alias="cert_$(date '+%Y%m%d%H%M%S')"
     _private_key=$(cat "${_domain}".key)
     _public_key=$(cat "${_domain}".crt)
