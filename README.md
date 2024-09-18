@@ -130,3 +130,19 @@ $ kubectl kustomize .
 ```bash
 $ kubectl apply -k .
 ```
+
+取得したいドメインを受け持つIngressより/.well-known/acme-challenge/以下のリクエストをPodに転送するように設定してください。
+```yaml
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /.well-known/acme-challenge/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: rhems-getssl-svc
+                port:
+                  number: 80
+```
