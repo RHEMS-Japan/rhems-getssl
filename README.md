@@ -58,6 +58,8 @@ spec:
               env:
                 - name: TZ
                   value: Asia/Tokyo
+                - name: CLOUD
+                  value: aws # 証明書をアップロードするクラウドサービス aws or tencent
                 - name: POD_NAMESPACE
                   valueFrom:
                     fieldRef:
@@ -80,6 +82,32 @@ spec:
                   value: __SLACK_FAILED__ # slackの通知先
                 - name: SLACK_SUCCESS
                   value: __SLACK_SUCCESS__ # slackの通知先
+```
+
+kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: env
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: __AWS_ACCESS_KEY_ID__ # AWSのアクセスキー
+  AWS_SECRET_ACCESS_KEY: __AWS_SECRET_ACCESS_KEY__ # AWSのシークレットキー
+  AWS_DEFAULT_REGION: __AWS_DEFAULT_REGION__ # AWSのリージョン
+  AWS_DEFAULT_OUTPUT: json # AWSの出力形式
+```
+```yaml
+# tencentcloudの場合
+apiVersion: v1
+kind: Secret
+metadata:
+  name: env
+type: Opaque
+stringData:
+  TENCENTCLOUD_SECRET_ID: __TENCENTCLOUD_SECRET_ID__
+  TENCENTCLOUD_SECRET_KEY: __TENCETCLOUD_SECRET_KEY__
+  TENCENTCLOUD_REGION: __TENCENTCLOUD_REGION__
 ```
 
 kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。

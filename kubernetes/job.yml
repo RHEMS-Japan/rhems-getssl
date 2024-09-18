@@ -54,6 +54,8 @@ spec:
           env:
             - name: TZ
               value: Asia/Tokyo
+            - name: CLOUD
+              value: aws
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:

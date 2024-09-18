@@ -100,7 +100,20 @@ if cat getssl.log | grep -qE 'Certificate saved in' ; then
   echo "Certificate created successfully"
   echo "certificate upload to cert manager"
   cd /root/.getssl/"${_domain}"
-  aws acm import-certificate --certificate fileb://"${_domain}".crt --certificate-chain fileb://chain.crt --private-key fileb://"${_domain}".key | tee -a getssl.log
+  _log=""
+  if [ "${CLOUD}" == "aws" ]; then
+    aws acm import-certificate --certificate fileb://"${_domain}".crt --certificate-chain fileb://chain.crt --private-key fileb://"${_domain}".key | tee -a getssl.log
+    _log=$(cat getssl.log | jq -r '.CertificateArn' | jq -sRr @uri)
+  elif [ "${CLOUD}" == "tencent" ]; then
+    _alias="cert_$(date '+%Y%m%d%H%M%S')"
+    _private_key=$(cat "${_domain}".key)
+    _public_key=$(cat "${_domain}".crt)
+    tccli ssl UploadCertificate --CertificatePublicKey "${_public_key}" --CertificatePrivateKey "${_private_key}" --CertificateType SVR --output json --Alias "${_alias}" | tee -a getssl.log
+    _log=$(cat getssl.log | jq -r '.CertificateId' | jq -sRr @uri)
+
+    _cert_secret_name=$(kubectl get secrets -n "${POD_NAMESPACE}" -o json | jq -r '.items[].metadata.name' | grep -e '^certificate-[a-z,0-9]*')
+    kubectl patch secret -n "${POD_NAMESPACE}" "${_cert_secret_name}" -p '{"data":{"qcloud_cert_id":"'"${_log}"'"}}'
+  fi
   curl -X POST -H "Content-Type: application/json" \
       https://badges.rhems-japan.com/api-update-badge \
       -d '{

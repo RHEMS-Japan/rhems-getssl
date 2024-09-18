@@ -1,7 +1,7 @@
 FROM alpine:3.20.3
 
 # Install necessary packages
-RUN apk add --no-cache bind-tools jq unzip sudo curl bash openssl aws-cli git py3-pip
+RUN apk add --no-cache bind-tools jq unzip sudo curl bash openssl aws-cli git py3-pip pwgen
 
 # Install getssl
 WORKDIR /tmp/getssl

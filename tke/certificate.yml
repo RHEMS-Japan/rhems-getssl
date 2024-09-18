@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: certificate-abcde921
+data:
+  qcloud_cert_id: dGVzdFRlc3Q=
+type: Opaque
