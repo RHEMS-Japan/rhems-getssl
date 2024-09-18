@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: test-getssl-svc
+  name: rhems-getssl-svc
   labels:
-    app: test-getssl-svc
+    app: rhems-getssl-svc
 spec:
   type: NodePort
   selector:
-    app: test-getssl-go
+    app: rhems-getssl-go
   ports:
     - targetPort: 80
       port: 80

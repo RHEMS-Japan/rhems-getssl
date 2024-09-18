@@ -1,23 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: test-getssl-go
+  name: rhems-getssl-go
   labels:
-    app: test-getssl-go
+    app: rhems-getssl-go
 spec:
   selector:
     matchLabels:
-      app: test-getssl-go
+      app: rhems-getssl-go
   template:
     metadata:
       labels:
-        app: test-getssl-go
+        app: rhems-getssl-go
     spec:
       nodeSelector:
         karpenter.sh/provisioner-name: spondemand-amd64
       containers:
-        - name: test-getssl-go
-          image: 063150541913.dkr.ecr.ap-northeast-1.amazonaws.com/rhems-getssl@sha256:fd087330f0047066f8433dac868a9b7326eff070592a2d5d5f0868e37f449ab3
+        - name: rhems-getssl-go
+          image: rhems-getssl-go
+          #image: 063150541913.dkr.ecr.ap-northeast-1.amazonaws.com/rhems-getssl@sha256:fd087330f0047066f8433dac868a9b7326eff070592a2d5d5f0868e37f449ab3
           imagePullPolicy: IfNotPresent
           workingDir: /root
           command: ["/root/server"]
