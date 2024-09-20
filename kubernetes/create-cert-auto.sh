@@ -108,6 +108,7 @@ if cat getssl.log | grep -qE 'Certificate saved in' ; then
   if [ "${CLOUD}" == "aws" ]; then
     echo "aws"
     aws acm import-certificate --certificate fileb://"${_domain}".crt --certificate-chain fileb://chain.crt --private-key fileb://"${_domain}".key | tee -a getssl.log
+    kubectl patch ingress -n "${POD_NAMESPACE}" rhems-getssl-ingress -p "{\"metadata\":{\"annotations\":{\"alb.ingress.kubernetes.io/certificate-arn\":\"$(cat getssl.log | jq -r '.CertificateArn')\"}}}"
     _log=$(cat getssl.log | jq -r '.CertificateArn' | jq -sRr @uri)
   elif [ "${CLOUD}" == "tencent" ]; then
     echo "tencent"
