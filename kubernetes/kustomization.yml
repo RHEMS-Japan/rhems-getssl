@@ -35,3 +35,6 @@ configMapGenerator:
   - name: file-name-base
     files:
       - file-name-base.yml
+  - name: account-key-base
+    files:
+      - account-key-base.yml

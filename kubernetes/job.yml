@@ -28,22 +28,30 @@ spec:
             requests:
               cpu: 250m
               memory: 256Mi
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           volumeMounts:
             - name: root
               mountPath: /root
             - name: init-sh
               mountPath: /tmp/init.sh
               subPath: init.sh
+            - name: account-key-base
+              mountPath: /root/account-key-base.yml
+              subPath: account-key-base.yml
       containers:
         - name: getssl
           image: rhems-getssl-job
           imagePullPolicy: IfNotPresent
           workingDir: /root
-#          command:
-#            - ./create-cert-auto.sh
-#          args:
-#            - test-getssl.rhems-labs.org
-          command: ["sleep", "3600"]
+          command:
+            - ./create-cert-auto.sh
+          args:
+            - test-getssl.rhems-labs.org
+#          command: ["sleep", "3600"]
           resources:
             limits:
               cpu: 250m
@@ -95,6 +103,10 @@ spec:
         - name: file-name-base
           configMap:
             name: file-name-base
+            defaultMode: 0755
+        - name: account-key-base
+          configMap:
+            name: account-key-base
             defaultMode: 0755
         - name: root
           emptyDir: {}

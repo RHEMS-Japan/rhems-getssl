@@ -39,6 +39,9 @@ spec:
                 - name: init-sh
                   mountPath: /tmp/init.sh
                   subPath: init.sh
+                - name: account-key-base
+                  mountPath: /root/account-key-base.yml
+                  subPath: account-key-base.yml
           containers:
             - name: rhems-getssl
               image: rhems-getssl-job
@@ -117,6 +120,10 @@ spec:
             - name: file-name-base
               configMap:
                 name: file-name-base
+                defaultMode: 0755
+            - name: account-key-base
+              configMap:
+                name: account-key-base
                 defaultMode: 0755
             - name: root
               emptyDir: {}
