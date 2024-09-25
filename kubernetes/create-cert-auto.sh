@@ -73,6 +73,8 @@ if cat getssl.log | grep -qE 'Verification completed, obtaining certificate'; th
   exit 0
 fi
 
+rm getssl.log
+
 _file_name=""
 _file_content=""
 for file in $(find /var/www/html/.well-known/acme-challenge/ -maxdepth 1 -type f); do
