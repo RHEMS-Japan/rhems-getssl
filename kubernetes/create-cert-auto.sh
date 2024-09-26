@@ -116,6 +116,7 @@ while [ ${count} -lt 10 ]; do
 done
 
 ./getssl -f "${_domain}" 2>&1 | tee -a getssl.log
+date
 
 # cronjobにした場合下記
 if cat getssl.log | grep -qE 'for some reason could not reach' ; then
