@@ -47,11 +47,11 @@ spec:
           image: rhems-getssl-job
           imagePullPolicy: IfNotPresent
           workingDir: /root
-          command:
-            - ./create-cert-auto.sh
-          args:
-            - test-getssl.rhems-labs.org
-#          command: ["sleep", "3600"]
+#          command:
+#            - ./create-cert-auto.sh
+#          args:
+#            - test-getssl.rhems-labs.org
+          command: ["sleep", "3600"]
           resources:
             limits:
               cpu: 250m
@@ -85,6 +85,9 @@ spec:
             - name: file-name-base
               mountPath: /root/file-name-base.yml
               subPath: file-name-base.yml
+            - name: config
+              mountPath: /root/config.yml
+              subPath: config.yml
             - name: root
               mountPath: /root
       volumes:
@@ -107,6 +110,10 @@ spec:
         - name: account-key-base
           configMap:
             name: account-key-base
+            defaultMode: 0755
+        - name: config
+          configMap:
+            name: config
             defaultMode: 0755
         - name: root
           emptyDir: {}

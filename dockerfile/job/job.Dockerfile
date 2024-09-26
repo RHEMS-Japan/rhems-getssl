@@ -1,3 +1,10 @@
+FROM golang:1.23.1-alpine3.19 as create-cert
+WORKDIR /tmp/create-cert
+COPY go.mod go.sum ./
+COPY main.go ./
+RUN go mod download
+RUN go build -ldflags="-w -s" -o ./create-cert ./main.go
+
 FROM alpine:3.20.3
 
 # Install necessary packages
@@ -19,3 +26,5 @@ RUN sudo pip3 install --break-system-packages tccli-intl-en
 
 # Create a directory for the acme-challenge
 RUN mkdir -p /var/www/html/.well-known/acme-challenge && chmod 777 /var/www/html/.well-known/acme-challenge
+
+COPY --from=create-cert /tmp/create-cert/create-cert /tmp/create-cert

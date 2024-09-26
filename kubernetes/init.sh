@@ -4,6 +4,7 @@ _domain=$1
 
 cd /root
 mv /tmp/getssl/getssl /root/getssl
+mv /tmp/create-cert /root/create-cert
 ./getssl -c "${_domain}"
 sed -i 's/SANS=/#SANS=/g' /root/.getssl/"${_domain}"/getssl.cfg
 echo "CA='https://acme-staging-v02.api.letsencrypt.org'" >> /root/.getssl/"${_domain}"/getssl.cfg

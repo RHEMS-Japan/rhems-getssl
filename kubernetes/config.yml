@@ -1,0 +1,5 @@
+info:
+  - namespace: yutaro-test
+    ingress_name: rhems-getssl-ingress
+    domains:
+      - test-getssl.rhems-labs.org

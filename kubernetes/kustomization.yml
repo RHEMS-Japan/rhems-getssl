@@ -4,11 +4,11 @@ kind: Kustomization
 namespace: yutaro-test
 
 resources:
-#  - job.yml
+  - job.yml
 #  - _cronjob.yml
-  - cronjob.yml
-#  - _env.yml
-  - env.yml
+#  - cronjob.yml
+  - _env.yml
+#  - env.yml
   - go.yml
   - svc.yml
   - ingress.yml
@@ -20,7 +20,7 @@ images:
     digest: sha256:fd087330f0047066f8433dac868a9b7326eff070592a2d5d5f0868e37f449ab3
   - name: rhems-getssl-job
     newName: 063150541913.dkr.ecr.ap-northeast-1.amazonaws.com/rhems-getssl
-    digest: sha256:b9e434c837dcb50bac565318cc66c2450259ec195b619d2b94871503d5c3f54a
+    digest: sha256:962f5c8598a7d65af60004fdf5b29eabf77e2a4c1b638ab0c0655a8799d47d63
 
 configMapGenerator:
   - name: create-cert-auto-sh
@@ -38,3 +38,6 @@ configMapGenerator:
   - name: account-key-base
     files:
       - account-key-base.yml
+  - name: config
+    files:
+      - config.yml

@@ -8,5 +8,5 @@ WORKDIR /root
 COPY server.go /root/server.go
 COPY go.mod /root/go.mod
 RUN go mod download
-RUN go build -o /root/server /root/server.go
+RUN go build -ldflags="-s -w" -o /root/server /root/server.go
 
