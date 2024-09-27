@@ -1,11 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common"
+	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common/errors"
+	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common/profile"
+	ssl "github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/ssl/v20191205"
 	"gopkg.in/yaml.v2"
 	"io"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +37,22 @@ type Info struct {
 
 type Config struct {
 	Info []Info `yaml:"info"`
+}
+
+type Badges struct {
+	ApiToken     string `json: "api_token"`
+	Organization string `json: "organization"`
+	Repo         string `json: "repo"`
+	App          string `json: "app"`
+	Branch       string `json: "branch"`
+	Status       bool   `json: "status"`
+	Update       string `json: "update"`
+	Cronjob      string `json "cronjob"`
+	GraceTime    int    `json: "grace_time"`
+	SlackFailed  string `json: "slack_failed"`
+	SlackSuccess string `json: "slack_success"`
+	Msg          string `json: "msg"`
+	Log          string `json: "log"`
 }
 
 func main() {
@@ -81,16 +103,18 @@ func main() {
 				findOut, _ := find.Output()
 				var fullpath string = string(findOut)
 				basename := filepath.Base(fullpath)
-				cat := exec.Command("cat", fullpath, "2&>1")
-				content, _ := cat.Output()
+				content, err := os.ReadFile(strings.TrimSuffix(fullpath, "\n"))
+				if err != nil {
+					panic(err)
+				}
 
 				fmt.Println("content: ", string(content))
 
 				exec.Command("cp", "acme-challenge-base.yml", "acme-challenge.yml").Run()
 				exec.Command("cp", "file-name-base.yml", "file-name.yml").Run()
 				replaceStringInFile("acme-challenge.yml", "__FILE_NAME__", basename)
+				replaceStringInFile("acme-challenge.yml", "__CONTENT__", string(content))
 				replaceStringInFile("file-name.yml", "__FILE_NAME__", basename)
-				replaceStringInFile("file-name.yml", "__CONTENT__", string(content))
 
 				exec.Command("kubectl", "delete", "configmap", "acme-challenge", "-n", os.Getenv("POD_NAMESPACE")).Run()
 				exec.Command("kubectl", "delete", "configmap", "file-name", "-n", os.Getenv("POD_NAMESPACE")).Run()
@@ -193,6 +217,11 @@ func uploadCert(domain string, cloud string) {
 
 		fmt.Println("Certificate uploaded successfully")
 		fmt.Println("Certificate ARN: ", *arn)
+	} else {
+		json := uploadCertTencet(cert, privateKet)
+
+		fmt.Println("Certificate uploaded successfully")
+		fmt.Println("Certificate ARN: ", *json)
 	}
 }
 
@@ -218,6 +247,43 @@ func uploadCertAWS(certificate []byte, privateKey []byte, certificateChain []byt
 	return output.CertificateArn
 }
 
+func uploadCertTencet(certificate []byte, privateKey []byte) *string {
+	// Required steps:
+	// Instantiate an authentication object. The Tencent Cloud account key pair `secretId` and `secretKey` need to be passed in as the input parameters
+	// This example uses the way to read from the environment variable, so you need to set these two values in the environment variable in advance
+	// You can also write the key pair directly into the code, but be careful not to copy, upload, or share the code to others
+	// Query the CAM key: https://console.tencentcloud.com/capi
+	credential := common.NewCredential(os.Getenv("TENCENTCLOUD_SECRET_ID"), os.Getenv("TENCENTCLOUD_SECRET_KEY"))
+	// Optional steps:
+	// Instantiate a client configuration object. You can specify the timeout period and other configuration items
+	cpf := profile.NewClientProfile()
+	cpf.HttpProfile.Endpoint = "ssl.tencentcloudapi.com"
+	// Instantiate an client object
+	// The second parameter is the region information. You can directly enter the string "ap-guangzhou" or import the preset constant
+	client, _ := ssl.NewClient(credential, os.Getenv("TENCENTCLOUD_REGION"), cpf)
+
+	// Instantiate a request object. You can further set the request parameters according to the API called and actual conditions
+	request := ssl.NewUploadCertificateRequest()
+
+	request.CertificatePublicKey = common.StringPtr(string(certificate))
+	request.CertificatePrivateKey = common.StringPtr(string(privateKey))
+
+	// The returned "resp" is an instance of the UploadCertificateResponse class which corresponds to the request object
+	response, err := client.UploadCertificate(request)
+	if _, ok := err.(*errors.TencentCloudSDKError); ok {
+		fmt.Printf("An API error has returned: %s", err)
+		return nil
+	}
+	if err != nil {
+		panic(err)
+	}
+	// A string return packet in JSON format is output
+
+	res := response.ToJsonString()
+
+	return &res
+}
+
 func replaceStringInFile(filename string, old string, new string) {
 	input, err := os.ReadFile(filename)
 	if err != nil {
@@ -236,17 +302,47 @@ func replaceStringInFile(filename string, old string, new string) {
 
 func waitAvailable(url string, content string) {
 	// Wait for the file to be available
+	var resp *http.Response
+	var body []byte
+	var err error
 	for {
-		resp, _ := http.Get(url)
-		err := resp.Body.Close()
+		resp, err = http.Get(strings.TrimSuffix(url, "\n"))
+		if err != nil {
+			fmt.Println("err", err)
+		}
+		body, err = io.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Println("err", err)
+			break
+		}
+		fmt.Println("body", strings.TrimSuffix(string(body), "\n"))
+		fmt.Println("content", content)
+		if strings.TrimSuffix(string(body), "\n") == content {
+			fmt.Println("File available")
+			break
+		}
+		err = resp.Body.Close()
 		if err != nil {
 			break
 		}
-		body, _ := io.ReadAll(resp.Body)
-		if string(body) == content {
-			break
-		}
 		resp = nil
+		body = nil
+		err = nil
+		fmt.Println("File not available yet")
 		time.Sleep(10 * time.Second)
+	}
+}
+
+func postToBadges(badges Badges) {
+	json, _ := json.Marshal(badges)
+	fmt.Printf("[+] %s\n", string(json))
+
+	res, err := http.Post("https://badges.rhems-japan.com/api-update-badge", "application/json", bytes.NewBuffer(json))
+	defer res.Body.Close()
+
+	if err != nil {
+		fmt.Println("[!] " + err.Error())
+	} else {
+		fmt.Println("[*] " + res.Status)
 	}
 }

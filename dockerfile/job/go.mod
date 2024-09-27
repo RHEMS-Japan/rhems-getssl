@@ -5,6 +5,7 @@ go 1.22.0
 require (
 	github.com/aws/aws-sdk-go-v2/config v1.27.38
 	github.com/aws/aws-sdk-go-v2/service/acm v1.29.2
+	github.com/tencentcloud/tencentcloud-sdk-go-intl-en v3.0.1054+incompatible
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.31.1
 	k8s.io/client-go v0.31.1
