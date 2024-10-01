@@ -8,7 +8,8 @@ RUN go build -ldflags="-w -s" -o ./create-cert ./main.go
 FROM alpine:3.20.3
 
 # Install necessary packages
-RUN apk add --no-cache bind-tools jq unzip sudo curl bash openssl aws-cli git py3-pip pwgen
+#RUN apk add --no-cache bind-tools jq unzip sudo curl bash openssl aws-cli git py3-pip pwgen
+RUN apk add --no-cache bind-tools jq unzip sudo curl bash openssl git
 
 # Install getssl
 WORKDIR /tmp/getssl
@@ -20,9 +21,9 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
       && mv kubectl /usr/local/bin/kubectl \
       && chmod +x /usr/local/bin/kubectl
 
-# Install tccli
-WORKDIR /tmp/tccli
-RUN sudo pip3 install --break-system-packages tccli-intl-en
+## Install tccli
+#WORKDIR /tmp/tccli
+#RUN sudo pip3 install --break-system-packages tccli-intl-en
 
 # Create a directory for the acme-challenge
 RUN mkdir -p /var/www/html/.well-known/acme-challenge && chmod 777 /var/www/html/.well-known/acme-challenge

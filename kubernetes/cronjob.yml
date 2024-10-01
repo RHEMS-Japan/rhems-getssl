@@ -23,34 +23,14 @@ spec:
               imagePullPolicy: IfNotPresent
               workingDir: /tmp
               command:
-                - ./init.sh
+                - ./create-cert
               args:
-                - __DOMAIN__
-              resources:
-                limits:
-                  cpu: 250m
-                  memory: 256Mi
-                requests:
-                  cpu: 250m
-                  memory: 256Mi
-              volumeMounts:
-                - name: root
-                  mountPath: /root
-                - name: init-sh
-                  mountPath: /tmp/init.sh
-                  subPath: init.sh
-                - name: account-key-base
-                  mountPath: /root/account-key-base.yml
-                  subPath: account-key-base.yml
-          containers:
-            - name: rhems-getssl
-              image: rhems-getssl-job
-              imagePullPolicy: IfNotPresent
-              workingDir: /root
-              command:
-                - ./create-cert-auto.sh
-              args:
-                - test-getssl.rhems-labs.org
+                - '-c'
+                - 'aws'
+                - '-i'
+                - 'true'
+                - '-f'
+                - '/root/config.yml'
               resources:
                 limits:
                   cpu: 250m
@@ -61,8 +41,60 @@ spec:
               env:
                 - name: TZ
                   value: Asia/Tokyo
-                - name: CLOUD
-                  value: aws
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: API_TOKEN
+                  value: __BADGE_API_TOKEN__
+                - name: ORGANIZATION
+                  value: __ORGANIZATION__
+                - name: REPO
+                  value: __REPO__
+                - name: APP
+                  value: __APP__
+                - name: BRANCH
+                  value: __BRANCH__
+                - name: CRON
+                  value: "0 15 * * *"
+                - name: GRACE_TIME
+                  value: "10"
+                - name: SLACK_FAILED
+                  value: __SLACK_FAILED__
+                - name: SLACK_SUCCESS
+                  value: __SLACK_SUCCESS__
+              volumeMounts:
+                - name: root
+                  mountPath: /root
+                - name: init-sh
+                  mountPath: /tmp/init.sh
+                  subPath: init.sh
+                - name: account-key-base
+                  mountPath: /root/account-key-base.yml
+                  subPath: account-key-base.yml
+                - name: config
+                  mountPath: /root/config.yml
+                  subPath: config.yml
+          containers:
+            - name: rhems-getssl
+              image: rhems-getssl-job
+              imagePullPolicy: IfNotPresent
+              workingDir: /root
+              command:
+                - ./create-cert
+              args:
+                - '-c'
+                - 'aws'
+              resources:
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
+                requests:
+                  cpu: 250m
+                  memory: 256Mi
+              env:
+                - name: TZ
+                  value: Asia/Tokyo
                 - name: POD_NAMESPACE
                   valueFrom:
                     fieldRef:

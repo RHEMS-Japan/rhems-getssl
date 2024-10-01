@@ -1,5 +1,6 @@
 info:
   - namespace: yutaro-test
     ingress_name: rhems-getssl-ingress
+    secret_name: tencent-cert
     domains:
       - test-getssl.rhems-labs.org
