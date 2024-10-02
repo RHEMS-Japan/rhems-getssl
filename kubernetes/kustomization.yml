@@ -20,7 +20,7 @@ images:
     digest: sha256:ad4a810741588925d73125428765df9fc66092db00af25b3dbeab6d0297bf6f2
   - name: rhems-getssl-job
     newName: 063150541913.dkr.ecr.ap-northeast-1.amazonaws.com/rhems-getssl
-    digest: sha256:3bdb5635f0535455d5b9b64b1734214e700d5c25b7e57d4f9ab29bd5b4f95a88
+    digest: sha256:55d22c36091c523acdabf37afd4dac0739ee448f254dd20e3cbf931e36f4d07a
 
 configMapGenerator:
   - name: create-cert-auto-sh

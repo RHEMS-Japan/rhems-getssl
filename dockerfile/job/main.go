@@ -58,36 +58,48 @@ type Badges struct {
 	Log          string `json:"log"`
 }
 
+type Cert struct {
+	ExpireTime    time.Time
+	ExpireJSTTime time.Time
+	ExpireDate    string
+	ExpireJSTDate string
+}
+
+var yamlFile string
+var cloud string
+var initialize bool
+var force bool
+var updateBeforeDay int
+
 func main() {
-	var yamlFile string
-	var cloud string
-	var init string
-	flag.StringVar(&yamlFile, "f", "config.yml", "Path to the YAML file containing info")
-	flag.StringVar(&cloud, "c", "aws", "Cloud provider")
-	flag.StringVar(&init, "i", "false", "Initialize")
+	flag.StringVar(&yamlFile, "f", "config.yml", "Path to the YAML file containing info. default '-f config.yml'")
+	flag.StringVar(&cloud, "c", "aws", "Select cloud provider aws or tencent. default '-c aws'")
+	flag.BoolVar(&initialize, "i", false, "Initialize create-cert")
+	flag.BoolVar(&force, "force", false, "Force cert update even if it is not expired. default '-force=false'")
+	flag.IntVar(&updateBeforeDay, "update-before-day", 3, "Update before date. default '-update-before-day 3'")
 	flag.Parse()
 
 	if yamlFile == "" {
 		fmt.Println("Please provide the path to the YAML file using -f flag.")
-		postToBadges(false, "Please provide the path to the YAML file using -f flag.", "config file not found")
+		postToBadges(os.Getenv("BRANCH"), false, "Please provide the path to the YAML file using -f flag.", "config file not found", 0)
 		os.Exit(1)
 	}
 
 	yamlData, err := os.ReadFile(yamlFile)
 	if err != nil {
 		fmt.Println(err.Error())
-		postToBadges(false, err.Error(), "config file read error")
+		postToBadges(os.Getenv("BRANCH"), false, err.Error(), "config file read error", 0)
 		os.Exit(1)
 	}
 
 	var config Config
 	if err := yaml.Unmarshal(yamlData, &config); err != nil {
 		fmt.Println(err.Error())
-		postToBadges(false, err.Error(), "config file unmarshal error")
+		postToBadges(os.Getenv("BRANCH"), false, err.Error(), "config file unmarshal error", 0)
 		os.Exit(1)
 	}
 
-	if init == "true" {
+	if initialize {
 		fmt.Println("Initialize")
 		for _, info := range config.Info {
 			fmt.Println("Namespace: ", info.Namespace)
@@ -99,7 +111,7 @@ func main() {
 				output, err := cmd.Output()
 				if err != nil {
 					fmt.Println(err.Error())
-					postToBadges(false, "init.sh error", err.Error())
+					postToBadges(domain, false, "init.sh error", err.Error(), 0)
 					os.Exit(1)
 				}
 				fmt.Println("Output: \n", string(output))
@@ -116,6 +128,26 @@ func main() {
 		fmt.Println("Domains: ", info.Domains)
 
 		for _, domain := range info.Domains {
+			if !force {
+				cert := checkCertValidation(domain)
+				fmt.Println("Domain: ", domain)
+				fmt.Println("Expire Time: ", cert.ExpireTime)
+				fmt.Println("Expire JST Time: ", cert.ExpireJSTTime)
+				fmt.Println("Expire Date: ", cert.ExpireDate)
+				fmt.Println("Expire JST Date: ", cert.ExpireJSTDate)
+				fmt.Println("Update Before Day: ", updateBeforeDay)
+				fmt.Println("しきい値: ", cert.ExpireTime.Add(-24*time.Duration(updateBeforeDay)*time.Hour))
+
+				if time.Now().After(cert.ExpireTime.Add(-24 * time.Duration(updateBeforeDay) * time.Hour)) {
+					fmt.Println("Certificate needs to be updated")
+				} else {
+					fmt.Println("Certificate is still valid")
+					postToBadges(domain, true, "Certificate is still valid", fmt.Sprintf("Expire Date: %s", cert.ExpireDate), 0)
+					continue
+				}
+			} else {
+				fmt.Println("Domain: ", domain)
+			}
 			getssl := exec.Command("./getssl", "-f", domain)
 			out, _ := getssl.Output()
 
@@ -128,7 +160,7 @@ func main() {
 			if match {
 				fmt.Println("Certificate created successfully\ncertificate upload to cert manager")
 
-				uploadCert(domain, cloud, info.SecretName, clientSet)
+				uploadCert(domain, cloud, info.SecretName, info.IngressName, info.Namespace, clientSet)
 			} else {
 				find := exec.Command("find", "/var/www/html/.well-known/acme-challenge/", "-maxdepth", "1", "-type", "f")
 				findOut, _ := find.Output()
@@ -137,7 +169,7 @@ func main() {
 				content, err := os.ReadFile(strings.TrimSuffix(fullpath, "\n"))
 				if err != nil {
 					fmt.Println(err.Error())
-					postToBadges(false, "acme-challenge file read error", err.Error())
+					postToBadges(domain, false, "acme-challenge file read error", err.Error(), 0)
 					os.Exit(1)
 				}
 
@@ -152,31 +184,31 @@ func main() {
 				err = exec.Command("kubectl", "delete", "configmap", "acme-challenge", "-n", os.Getenv("POD_NAMESPACE")).Run()
 				if err != nil {
 					fmt.Println(err.Error())
-					postToBadges(false, "acme-challenge configmap delete error", err.Error())
+					postToBadges(domain, false, "acme-challenge configmap delete error", err.Error(), 0)
 					os.Exit(1)
 				}
 				err = exec.Command("kubectl", "delete", "configmap", "file-name", "-n", os.Getenv("POD_NAMESPACE")).Run()
 				if err != nil {
 					fmt.Println(err.Error())
-					postToBadges(false, "file-name configmap delete error", err.Error())
+					postToBadges(domain, false, "file-name configmap delete error", err.Error(), 0)
 					os.Exit(1)
 				}
 				err = exec.Command("kubectl", "apply", "-f", "acme-challenge.yml", "-n", os.Getenv("POD_NAMESPACE")).Run()
 				if err != nil {
 					fmt.Println(err.Error())
-					postToBadges(false, "acme-challenge configmap apply error", err.Error())
+					postToBadges(domain, false, "acme-challenge configmap apply error", err.Error(), 0)
 					os.Exit(1)
 				}
 				err = exec.Command("kubectl", "apply", "-f", "file-name.yml", "-n", os.Getenv("POD_NAMESPACE")).Run()
 				if err != nil {
 					fmt.Println(err.Error())
-					postToBadges(false, "file-name configmap apply error", err.Error())
+					postToBadges(domain, false, "file-name configmap apply error", err.Error(), 0)
 					os.Exit(1)
 				}
 				err = exec.Command("kubectl", "rollout", "restart", "deployment", "rhems-getssl-go", "-n", os.Getenv("POD_NAMESPACE")).Run()
 				if err != nil {
 					fmt.Println(err.Error())
-					postToBadges(false, "rhems-getssl-go deployment restart error", err.Error())
+					postToBadges(domain, false, "rhems-getssl-go deployment restart error", err.Error(), 0)
 					os.Exit(1)
 				}
 
@@ -194,28 +226,15 @@ func main() {
 
 				if matchAgain {
 					fmt.Println("Certificate creation successful")
-					uploadCert(domain, cloud, info.SecretName, clientSet)
+					uploadCert(domain, cloud, info.SecretName, info.IngressName, info.Namespace, clientSet)
 				} else {
 					fmt.Println("Certificate creation failed")
 				}
 			}
 		}
-
-		//ingressInterface := clientSet.NetworkingV1().Ingresses(info.Namespace)
-		//
-		//var arn string = "arn:aws:acm:ap-northeast-1:063150541913:certificate/aea2ee79-45c3-44f0-a8e4-c9d6e34fe4ee"
-		//ingressCertArnPatch := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"alb.ingress.kubernetes.io/certificate-arn":"%s"}}}`, arn))
-		//
-		//retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		//	_, updateErr := ingressInterface.Patch(context.TODO(), info.IngressName, types.StrategicMergePatchType, ingressCertArnPatch, metav1.PatchOptions{})
-		//	return updateErr
-		//})
-		//if retryErr != nil {
-		//	fmt.Printf("Error updating ingress %s: %v\n", info.IngressName, retryErr)
-		//} else {
-		//	fmt.Printf("Ingress %s updated successfully\n", info.IngressName)
-		//}
 	}
+
+	postToBadges(os.Getenv("BRANCH"), true, "All certificates are up to date", "All certificates are up to date", 0)
 }
 
 func initKubeClient() *kubernetes.Clientset {
@@ -253,7 +272,7 @@ func initKubeClient() *kubernetes.Clientset {
 	return clientSet
 }
 
-func uploadCert(domain string, cloud string, secretName string, clientSet *kubernetes.Clientset) {
+func uploadCert(domain string, cloud string, secretName string, ingressName string, namespace string, clientSet *kubernetes.Clientset) {
 	certPath := fmt.Sprintf("/root/.getssl/%s/%s.crt", domain, domain)
 	privateKeyPath := fmt.Sprintf("/root/.getssl/%s/%s.key", domain, domain)
 	certChainPath := fmt.Sprintf("/root/.getssl/%s/chain.crt", domain)
@@ -271,29 +290,31 @@ func uploadCert(domain string, cloud string, secretName string, clientSet *kuber
 		panic(err)
 	}
 	if cloud == "aws" {
-		arn := uploadCertAWS(cert, privateKet, certChain)
+		arn := uploadCertAWS(domain, cert, privateKet, certChain)
 
 		fmt.Println("Certificate uploaded successfully")
 		fmt.Println("Certificate ARN: ", *arn)
 
-		postToBadges(true, "Certificate uploaded successfully", "Certificate ARN: "+*arn)
+		editIngress(domain, clientSet, namespace, ingressName, *arn)
+
+		postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+*arn, 0)
 	} else {
-		response := uploadCertTencent(cert, privateKet)
+		response := uploadCertTencent(domain, cert, privateKet)
 
 		fmt.Println("Certificate uploaded successfully")
 		fmt.Println("Certificate response: ", response.ToJsonString())
 
-		editCertSecret(*response.Response.CertificateId, secretName, clientSet)
+		editCertSecret(domain, *response.Response.CertificateId, secretName, namespace, clientSet)
 
-		postToBadges(true, "Certificate uploaded successfully", "Certificate ID: "+*response.Response.CertificateId)
+		postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+*response.Response.CertificateId, 0)
 	}
 }
 
-func uploadCertAWS(certificate []byte, privateKey []byte, certificateChain []byte) *string {
+func uploadCertAWS(domain string, certificate []byte, privateKey []byte, certificateChain []byte) *string {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		fmt.Println(err.Error())
-		postToBadges(false, "awscli load config error", err.Error())
+		postToBadges(domain, false, "awscli load config error", err.Error(), 0)
 		os.Exit(1)
 	}
 
@@ -308,14 +329,14 @@ func uploadCertAWS(certificate []byte, privateKey []byte, certificateChain []byt
 	output, err := client.ImportCertificate(context.TODO(), input)
 	if err != nil {
 		fmt.Println(err.Error())
-		postToBadges(false, "Certificate upload error", err.Error())
+		postToBadges(domain, false, "Certificate upload error", err.Error(), 0)
 		os.Exit(1)
 	}
 
 	return output.CertificateArn
 }
 
-func uploadCertTencent(certificate []byte, privateKey []byte) *ssl.UploadCertificateResponse {
+func uploadCertTencent(domain string, certificate []byte, privateKey []byte) *ssl.UploadCertificateResponse {
 	// Required steps:
 	// Instantiate an authentication object. The Tencent Cloud account key pair `secretId` and `secretKey` need to be passed in as the input parameters
 	// This example uses the way to read from the environment variable, so you need to set these two values in the environment variable in advance
@@ -340,7 +361,7 @@ func uploadCertTencent(certificate []byte, privateKey []byte) *ssl.UploadCertifi
 	response, err := client.UploadCertificate(request)
 	if _, ok := err.(*errors.TencentCloudSDKError); ok {
 		fmt.Printf("An API error has returned: %s", err)
-		postToBadges(false, "tencent api error", fmt.Sprintf("An API error has returned: %s", err))
+		postToBadges(domain, false, "tencent api error", fmt.Sprintf("An API error has returned: %s", err), 0)
 		os.Exit(1)
 	}
 	// A string return packet in JSON format is output
@@ -348,8 +369,8 @@ func uploadCertTencent(certificate []byte, privateKey []byte) *ssl.UploadCertifi
 	return response
 }
 
-func editCertSecret(certificateId string, secretName string, clientSet *kubernetes.Clientset) {
-	secretInterface := clientSet.CoreV1().Secrets(os.Getenv("POD_NAMESPACE"))
+func editCertSecret(domain string, certificateId string, secretName string, namespace string, clientSet *kubernetes.Clientset) {
+	secretInterface := clientSet.CoreV1().Secrets(namespace)
 
 	var certIdBase64 string = b64.StdEncoding.EncodeToString([]byte(certificateId))
 	secretPatch := []byte(fmt.Sprintf(`{"data":{"qcloud_cert_id":"%s"}}`, certIdBase64))
@@ -360,9 +381,28 @@ func editCertSecret(certificateId string, secretName string, clientSet *kubernet
 	})
 	if retryErr != nil {
 		fmt.Printf("Error updating ingress %s: %v\n", secretName, retryErr)
-		postToBadges(false, "secret patch error", retryErr.Error())
+		postToBadges(domain, false, "secret patch error", retryErr.Error(), 0)
+		os.Exit(1)
 	} else {
 		fmt.Printf("Secret %s updated successfully\n", secretName)
+	}
+}
+
+func editIngress(domain string, clientSet *kubernetes.Clientset, namespace string, ingressName string, arn string) {
+	ingressInterface := clientSet.NetworkingV1().Ingresses(namespace)
+
+	ingressCertArnPatch := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"alb.ingress.kubernetes.io/certificate-arn":"%s"}}}`, arn))
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		_, updateErr := ingressInterface.Patch(context.TODO(), ingressName, types.StrategicMergePatchType, ingressCertArnPatch, metav1.PatchOptions{})
+		return updateErr
+	})
+	if retryErr != nil {
+		fmt.Printf("Error updating ingress %s: %v\n", ingressName, retryErr)
+		postToBadges(domain, false, "ingress patch error", retryErr.Error(), 0)
+		os.Exit(1)
+	} else {
+		fmt.Printf("Ingress %s updated successfully\n", ingressName)
 	}
 }
 
@@ -415,7 +455,7 @@ func waitAvailable(url string, content string) {
 	}
 }
 
-func postToBadges(status bool, msg string, log string) {
+func postToBadges(branch string, status bool, msg string, log string, count int) {
 	graceTime, err := strconv.Atoi(os.Getenv("GRACE_TIME"))
 	if err != nil {
 		graceTime = 3
@@ -426,8 +466,8 @@ func postToBadges(status bool, msg string, log string) {
 		ApiToken:     os.Getenv("API_TOKEN"),
 		Organization: os.Getenv("ORGANIZATION"),
 		Repo:         os.Getenv("REPO"),
-		App:          os.Getenv("APP"),
-		Branch:       os.Getenv("BRANCH"),
+		App:          branch,
+		Branch:       branch,
 		Status:       status,
 		Update:       date,
 		Cronjob:      os.Getenv("CRON"),
@@ -446,8 +486,38 @@ func postToBadges(status bool, msg string, log string) {
 
 	if err != nil {
 		fmt.Println("[!] " + err.Error())
-		os.Exit(1)
+		time.Sleep(3 * time.Second)
+		if count < 5 {
+			fmt.Println("[*] Retry")
+			count++
+			postToBadges(branch, status, msg, log, count)
+		} else {
+			fmt.Println("[*] Retry failed")
+			os.Exit(1)
+		}
 	} else {
 		fmt.Println("[*] " + res.Status)
+	}
+}
+
+func checkCertValidation(url string) *Cert {
+	res, err := http.Get("https://" + url)
+
+	if err != nil {
+		fmt.Println("cert validation error: ", err)
+		postToBadges(url, false, "Cert validation error", err.Error(), 0)
+		os.Exit(1)
+	}
+
+	expireTime := res.TLS.PeerCertificates[0].NotAfter
+	expireJSTTime := expireTime.In(time.FixedZone("Asia/Tokyo", 9*60*60))
+	expireDate := fmt.Sprintf("%s UTC", expireTime.Format("2006-01-02 15:04:05"))
+	expireJSTDate := fmt.Sprintf("%s JST", expireJSTTime.Format("2006-01-02 15:04:05"))
+
+	return &Cert{
+		ExpireTime:    expireTime,
+		ExpireJSTTime: expireJSTTime,
+		ExpireDate:    expireDate,
+		ExpireJSTDate: expireJSTDate,
 	}
 }
