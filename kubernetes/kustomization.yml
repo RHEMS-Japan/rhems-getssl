@@ -1,31 +1,27 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: yutaro-test
+namespace: rhems-getssl
 
 resources:
-#  - job.yml
-  - _cronjob.yml
-#  - cronjob.yml
-  - _env.yml
-#  - env.yml
+  - cronjob.yml
+  - env.yml
   - go.yml
   - svc.yml
   - ingress.yml
   - rbac.yml
+#  - file-name.yml 初回のみ
+#  - acme-challenge.yml　初回のみ
 
 images:
   - name: rhems-getssl-go
-    newName: 063150541913.dkr.ecr.ap-northeast-1.amazonaws.com/rhems-getssl
-    digest: sha256:ad4a810741588925d73125428765df9fc66092db00af25b3dbeab6d0297bf6f2
+    newName: registry.example/rhems-getssl
+    digest: sha256:aaaannnnccccsssskkkk
   - name: rhems-getssl-job
-    newName: 063150541913.dkr.ecr.ap-northeast-1.amazonaws.com/rhems-getssl
-    digest: sha256:55d22c36091c523acdabf37afd4dac0739ee448f254dd20e3cbf931e36f4d07a
+    newName: registry.example/rhems-getssl
+    digest: sha256:llllooooppppzzzzqqqq
 
 configMapGenerator:
-  - name: create-cert-auto-sh
-    files:
-      - create-cert-auto.sh
   - name: init-sh
     files:
       - init.sh

@@ -1,3 +1,4 @@
 /kubernetes/_env.yml
 /kubernetes/_cronjob.yml
 /kubernetes/_secret.yml
+/debug/
