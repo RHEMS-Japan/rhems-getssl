@@ -128,6 +128,9 @@ spec:
                 - name: file-name-base
                   mountPath: /root/file-name-base.yml
                   subPath: file-name-base.yml
+                - name: config
+                  mountPath: /root/config.yml
+                  subPath: config.yml
                 - name: root
                   mountPath: /root
           volumes:
