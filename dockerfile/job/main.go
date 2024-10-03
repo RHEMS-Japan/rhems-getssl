@@ -275,23 +275,36 @@ func initKubeClient() *kubernetes.Clientset {
 
 func uploadCert(domain string, cloud string, secretName string, ingressName string, namespace string, clientSet *kubernetes.Clientset) {
 	certPath := fmt.Sprintf("/root/.getssl/%s/%s.crt", domain, domain)
+	fullCertChainPath := fmt.Sprintf("/root/.getssl/%s/%s_chain.pem", domain, domain)
 	privateKeyPath := fmt.Sprintf("/root/.getssl/%s/%s.key", domain, domain)
 	certChainPath := fmt.Sprintf("/root/.getssl/%s/chain.crt", domain)
 
 	cert, err := os.ReadFile(certPath)
 	if err != nil {
-		panic(err)
+		fmt.Println(err.Error())
+		postToBadges(domain, false, "cert file read error", err.Error(), 0)
+		os.Exit(1)
 	}
-	privateKet, err := os.ReadFile(privateKeyPath)
+	privateKey, err := os.ReadFile(privateKeyPath)
 	if err != nil {
-		panic(err)
+		fmt.Println(err.Error())
+		postToBadges(domain, false, "private key file read error", err.Error(), 0)
+		os.Exit(1)
 	}
 	certChain, err := os.ReadFile(certChainPath)
 	if err != nil {
-		panic(err)
+		fmt.Println(err.Error())
+		postToBadges(domain, false, "chain file read error", err.Error(), 0)
+		os.Exit(1)
+	}
+	fullCertChain, err := os.ReadFile(fullCertChainPath)
+	if err != nil {
+		fmt.Println(err.Error())
+		postToBadges(domain, false, "full chain file read error", err.Error(), 0)
+		os.Exit(1)
 	}
 	if cloud == "aws" {
-		arn := uploadCertAWS(domain, cert, privateKet, certChain)
+		arn := uploadCertAWS(domain, cert, privateKey, certChain)
 
 		fmt.Println("Certificate uploaded successfully")
 		fmt.Println("Certificate ARN: ", *arn)
@@ -300,7 +313,7 @@ func uploadCert(domain string, cloud string, secretName string, ingressName stri
 
 		postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+*arn, 0)
 	} else {
-		response := uploadCertTencent(domain, cert, privateKet)
+		response := uploadCertTencent(domain, fullCertChain, privateKey)
 
 		fmt.Println("Certificate uploaded successfully")
 		fmt.Println("Certificate response: ", response.ToJsonString())

@@ -11,6 +11,7 @@ sed -i 's/SANS=/#SANS=/g' /root/.getssl/"${_domain}"/getssl.cfg
 echo "CA='https://acme-v02.api.letsencrypt.org'" >> /root/.getssl/"${_domain}"/getssl.cfg
 echo "ACL=('/var/www/html/.well-known/acme-challenge')" >> /root/.getssl/"${_domain}"/getssl.cfg
 echo "USE_SINGLE_ACL='true'" >> /root/.getssl/"${_domain}"/getssl.cfg
+echo "DOMAIN_CHAIN_LOCATION='.'" >> /root/.getssl/"${_domain}"/getssl.cfg
 
 _configmap_account_key=$(kubectl get cm account-key -o json | jq -r '.data."account.key"');
 
