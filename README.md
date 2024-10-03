@@ -46,8 +46,6 @@ spec:
               command:
                 - ./create-cert
               args:
-                - '-c'
-                - 'aws' # 証明書をアップロードするクラウドサービス aws or tencent
                 - '-i=true'
                 - '-f'
                 - '/root/config.yml'
