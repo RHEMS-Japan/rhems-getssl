@@ -104,6 +104,7 @@ func main() {
 		for _, info := range config.Info {
 			fmt.Println("Namespace: ", info.Namespace)
 			fmt.Println("Ingress Name: ", info.IngressName)
+			fmt.Println("Secret Name: ", info.SecretName)
 			fmt.Println("Domains: ", info.Domains)
 
 			for _, domain := range info.Domains {
