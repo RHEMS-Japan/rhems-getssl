@@ -150,7 +150,7 @@ func main() {
 				fmt.Println("Domain: ", domain)
 			}
 			getssl := exec.Command("./getssl", "-f", domain)
-			out, _ := getssl.Output()
+			out, _ := getssl.CombinedOutput()
 
 			fmt.Println("Output: ", string(out))
 			var getsslOutput string = string(out)
@@ -164,8 +164,10 @@ func main() {
 				uploadCert(domain, cloud, info.SecretName, info.IngressName, info.Namespace, clientSet)
 			} else {
 				find := exec.Command("find", "/var/www/html/.well-known/acme-challenge/", "-maxdepth", "1", "-type", "f")
-				findOut, _ := find.Output()
+				findOut, _ := find.CombinedOutput()
+				fmt.Println("Output: ", string(findOut))
 				var fullpath string = string(findOut)
+				fmt.Println("fullpath: ", fullpath)
 				basename := filepath.Base(fullpath)
 				content, err := os.ReadFile(strings.TrimSuffix(fullpath, "\n"))
 				if err != nil {
@@ -217,7 +219,7 @@ func main() {
 				waitAvailable(url, string(content))
 
 				getsslAgain := exec.Command("./getssl", "-f", domain)
-				getsslAgainOut, _ := getsslAgain.Output()
+				getsslAgainOut, _ := getsslAgain.CombinedOutput()
 
 				fmt.Println("Output: ", string(getsslAgainOut))
 				var getsslAgainOutput string = string(getsslAgainOut)
