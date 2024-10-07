@@ -10,8 +10,6 @@ resources:
   - svc.yml
   - ingress.yml
   - rbac.yml
-#  - file-name.yml 初回のみ
-#  - acme-challenge.yml　初回のみ
 
 images:
   - name: rhems-getssl-go

@@ -210,8 +210,6 @@ resources:
   - svc.yml
   - ingress.yml
   - rbac.yml
-  - file-name.yml # 初回のみ
-  - acme-challenge.yml　# 初回のみ
 
 images:
   - name: rhems-getssl-go
@@ -227,6 +225,12 @@ images:
 kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。
 ```bash
 $ kubectl kustomize .
+```
+
+GoサーバーPodの起動のため、先にfile-name.ymlとacme-challenge.ymlをapplyしてください。
+```bash
+$ kubectl apply -f file-name.yml
+$ kubectl apply -f acme-challenge.yml
 ```
 
 問題が無ければkubectl applyコマンドを実行してください。
