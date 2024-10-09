@@ -52,8 +52,6 @@ spec:
               env:
                 - name: TZ
                   value: Asia/Tokyo
-                - name: CLOUD
-                  value: aws # 証明書をアップロードするクラウドサービス aws or tencent
                 - name: POD_NAMESPACE
                   valueFrom:
                     fieldRef:
@@ -90,8 +88,6 @@ spec:
               env:
                 - name: TZ
                   value: Asia/Tokyo
-                - name: CLOUD
-                  value: aws # 証明書をアップロードするクラウドサービス aws or tencent
                 - name: POD_NAMESPACE
                   valueFrom:
                     fieldRef:
