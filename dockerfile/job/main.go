@@ -39,7 +39,8 @@ type Info struct {
 }
 
 type Config struct {
-	Info []Info `yaml:"info"`
+	Info                 []Info `yaml:"info"`
+	ServerDeploymentName string `yaml:"server_deployment_name"`
 }
 
 type Badges struct {
@@ -101,8 +102,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	clientSet := initKubeClient()
+
 	if initialize {
 		fmt.Println("Initialize")
+		if config.ServerDeploymentName == "" {
+			fmt.Println("Server Deployment Name is not provided. use default name 'rhems-getssl-go'.")
+			config.ServerDeploymentName = "rhems-getssl-go"
+		}
+		editDeployment(1, clientSet, os.Getenv("POD_NAMESPACE"), config.ServerDeploymentName)
 		for _, info := range config.Info {
 			fmt.Println("Namespace: ", info.Namespace)
 			fmt.Println("Ingress Name: ", info.IngressName)
@@ -111,10 +119,10 @@ func main() {
 
 			for _, domain := range info.Domains {
 				cmd := exec.Command("/tmp/init.sh", domain, letsEncryptEnvironment)
-				output, err := cmd.Output()
+				output, err := cmd.CombinedOutput()
 				if err != nil {
 					fmt.Println(err.Error())
-					postToBadges(domain, false, "init.sh error", err.Error(), 0)
+					postToBadges(domain, false, "init.sh error", string(output), 0)
 					os.Exit(1)
 				}
 				fmt.Println("Output: \n", string(output))
@@ -122,8 +130,6 @@ func main() {
 		}
 		os.Exit(0)
 	}
-
-	clientSet := initKubeClient()
 
 	for _, info := range config.Info {
 		fmt.Println("Namespace: ", info.Namespace)
@@ -151,6 +157,7 @@ func main() {
 			} else {
 				fmt.Println("Domain: ", domain)
 			}
+
 			getssl := exec.Command("./getssl", "-f", domain)
 			out, _ := getssl.CombinedOutput()
 
@@ -234,11 +241,19 @@ func main() {
 					uploadCert(domain, cloud, info.SecretName, info.IngressName, info.Namespace, clientSet)
 				} else {
 					fmt.Println("Certificate creation failed")
+					postToBadges(domain, false, "Certificate creation failed", getsslAgainOutput, 0)
+					os.Exit(1)
 				}
 			}
 		}
+
 	}
 
+	if config.ServerDeploymentName == "" {
+		fmt.Println("Server Deployment Name is not provided. use default name 'rhems-getssl-go'.")
+		config.ServerDeploymentName = "rhems-getssl-go"
+	}
+	editDeployment(0, clientSet, os.Getenv("POD_NAMESPACE"), config.ServerDeploymentName)
 	postToBadges(os.Getenv("BRANCH"), true, "All certificates are up to date", "All certificates are up to date", 0)
 }
 
@@ -424,10 +439,30 @@ func editIngress(domain string, clientSet *kubernetes.Clientset, namespace strin
 	}
 }
 
+func editDeployment(replicas int, clientSet *kubernetes.Clientset, namespace string, deploymentName string) {
+	deploymentInterface := clientSet.AppsV1().Deployments(namespace)
+
+	deploymentPatch := []byte(fmt.Sprintf(`{"spec":{"replicas":%d}}`, replicas))
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		_, updateErr := deploymentInterface.Patch(context.TODO(), deploymentName, types.StrategicMergePatchType, deploymentPatch, metav1.PatchOptions{})
+		return updateErr
+	})
+	if retryErr != nil {
+		fmt.Printf("Error updating deployment %s: %v\n", deploymentName, retryErr)
+		postToBadges(os.Getenv("BRANCH"), false, "deployment patch error", retryErr.Error(), 0)
+		os.Exit(1)
+	} else {
+		fmt.Printf("Deployment %s updated successfully\n", deploymentName)
+	}
+}
+
 func replaceStringInFile(filename string, old string, new string) {
 	input, err := os.ReadFile(filename)
 	if err != nil {
-		panic(err)
+		fmt.Println("Error reading file", err)
+		postToBadges(os.Getenv("BRANCH"), false, "Error reading file", err.Error(), 0)
+		os.Exit(1)
 	}
 
 	contents := string(input)
@@ -436,7 +471,9 @@ func replaceStringInFile(filename string, old string, new string) {
 
 	err = os.WriteFile(filename, []byte(contents), os.ModePerm)
 	if err != nil {
-		panic(err)
+		fmt.Println("Error writing file", err)
+		postToBadges(os.Getenv("BRANCH"), false, "Error writing file", err.Error(), 0)
+		os.Exit(1)
 	}
 }
 
@@ -473,7 +510,7 @@ func waitAvailable(url string, content string) {
 	}
 }
 
-func postToBadges(branch string, status bool, msg string, log string, count int) {
+func postToBadges(app string, status bool, msg string, log string, count int) {
 	graceTime, err := strconv.Atoi(os.Getenv("GRACE_TIME"))
 	if err != nil {
 		graceTime = 3
@@ -484,8 +521,8 @@ func postToBadges(branch string, status bool, msg string, log string, count int)
 		ApiToken:     os.Getenv("API_TOKEN"),
 		Organization: os.Getenv("ORGANIZATION"),
 		Repo:         os.Getenv("REPO"),
-		App:          branch,
-		Branch:       branch,
+		App:          app,
+		Branch:       os.Getenv("BRANCH"),
 		Status:       status,
 		Update:       date,
 		Cronjob:      os.Getenv("CRON"),
@@ -508,7 +545,7 @@ func postToBadges(branch string, status bool, msg string, log string, count int)
 		if count < 5 {
 			fmt.Println("[*] Retry")
 			count++
-			postToBadges(branch, status, msg, log, count)
+			postToBadges(app, status, msg, log, count)
 		} else {
 			fmt.Println("[*] Retry failed")
 			os.Exit(1)
