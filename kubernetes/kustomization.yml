@@ -20,18 +20,6 @@ images:
     digest: sha256:llllooooppppzzzzqqqq
 
 configMapGenerator:
-  - name: init-sh
-    files:
-      - init.sh
-  - name: acme-challenge-base
-    files:
-      - acme-challenge-base.yml
-  - name: file-name-base
-    files:
-      - file-name-base.yml
-  - name: account-key-base
-    files:
-      - account-key-base.yml
   - name: config
     files:
       - config.yml

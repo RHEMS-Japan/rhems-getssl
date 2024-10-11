@@ -6,6 +6,9 @@ _environment=$2
 cd /root
 mv /tmp/getssl/getssl /root/getssl
 mv /tmp/create-cert /root/create-cert
+mv /tmp/configmap/account-key-base.yml /root/account-key-base.yml
+mv /tmp/configmap/acme-challenge-base.yml /root/acme-challenge-base.yml
+mv /tmp/configmap/file-name-base.yml /root/file-name-base.yml
 ./getssl -c "${_domain}"
 sed -i 's/SANS=/#SANS=/g' /root/.getssl/"${_domain}"/getssl.cfg
 echo "ACL=('/var/www/html/.well-known/acme-challenge')" >> /root/.getssl/"${_domain}"/getssl.cfg
