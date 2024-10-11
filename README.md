@@ -256,7 +256,7 @@ spec:
     - host: test-getssl.rhems-labs.org
       http:
         paths:
-          - path: /.well-known/acme-challenge/*
+          - path: /.well-known/acme-challenge
             pathType: Prefix
             backend:
               service:
