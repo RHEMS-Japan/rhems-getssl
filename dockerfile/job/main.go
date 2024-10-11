@@ -70,6 +70,7 @@ var cloud string
 var initialize bool
 var force bool
 var updateBeforeDay int
+var letsEncryptEnvironment string
 
 func main() {
 	flag.StringVar(&yamlFile, "f", "config.yml", "Path to the YAML file containing info. default '-f config.yml'")
@@ -77,6 +78,7 @@ func main() {
 	flag.BoolVar(&initialize, "i", false, "Initialize create-cert")
 	flag.BoolVar(&force, "force", false, "Force cert update even if it is not expired. default '-force=false'")
 	flag.IntVar(&updateBeforeDay, "update-before-day", 3, "Update before date. default '-update-before-day 3'")
+	flag.StringVar(&letsEncryptEnvironment, "lets-encrypt-environment", "production", "Let's Encrypt environment production or staging. default '-lets-encrypt-environment production'")
 	flag.Parse()
 
 	if yamlFile == "" {
@@ -108,7 +110,7 @@ func main() {
 			fmt.Println("Domains: ", info.Domains)
 
 			for _, domain := range info.Domains {
-				cmd := exec.Command("/tmp/init.sh", domain)
+				cmd := exec.Command("/tmp/init.sh", domain, letsEncryptEnvironment)
 				output, err := cmd.Output()
 				if err != nil {
 					fmt.Println(err.Error())

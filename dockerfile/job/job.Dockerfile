@@ -29,3 +29,6 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
 RUN mkdir -p /var/www/html/.well-known/acme-challenge && chmod 777 /var/www/html/.well-known/acme-challenge
 
 COPY --from=create-cert /tmp/create-cert/create-cert /tmp/create-cert
+
+COPY ./init.sh /tmp/init.sh
+RUN chmod +x /tmp/init.sh
