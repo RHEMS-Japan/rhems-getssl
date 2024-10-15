@@ -2,3 +2,4 @@
 /kubernetes/_cronjob.yml
 /kubernetes/_secret.yml
 /debug/
+/dockerfile/job/route53/.env
