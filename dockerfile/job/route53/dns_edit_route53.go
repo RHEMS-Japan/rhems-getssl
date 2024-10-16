@@ -23,10 +23,12 @@ func main() {
 
 	switch basename {
 	case "dns_add_route53":
-		dns_add_route53(fqdn, challenge)
+		fmt.Println("dns_add_route53")
+		edit_route53("UPSERT", fqdn, challenge)
 		break
 	case "dns_remove_route53":
-		dns_remove_route53(fqdn, challenge)
+		fmt.Println("dns_remove_route53")
+		edit_route53("DELETE", fqdn, challenge)
 		break
 	default:
 		fmt.Println("Unknown basename")
@@ -34,8 +36,7 @@ func main() {
 	}
 }
 
-func dns_add_route53(fqdn string, challenge string) {
-	fmt.Println("dns_add_route53")
+func edit_route53(action string, fqdn string, challenge string) {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		fmt.Println("unable to load SDK config, ", err)
@@ -62,6 +63,7 @@ func dns_add_route53(fqdn string, challenge string) {
 			fmt.Println("zone id: ", filepath.Base(*zone.Id))
 			fmt.Println("zone name: ", name)
 			matchedZoneId = filepath.Base(*zone.Id)
+			break
 		}
 	}
 
@@ -71,28 +73,32 @@ func dns_add_route53(fqdn string, challenge string) {
 	}
 
 	challengeFqdn := fmt.Sprintf("\"_acme-challenge.%s\"", fqdn)
+	fmt.Println("challengeFqdn: ", challengeFqdn)
+	value := fmt.Sprintf("\"%s\"", challenge)
+	fmt.Println("value: ", value)
 	comment := "getssl/Letsencrypt verification"
 	var ttl int64 = 300
 	resourceRecord := types.ResourceRecord{
-		Value: &challengeFqdn,
+		Value: &value,
 	}
 	resourceRecordSet := types.ResourceRecordSet{
 		Name: &challengeFqdn,
-		Type: types.RRTypeTxt,
+		Type: "TXT",
 		TTL:  &ttl,
 		ResourceRecords: []types.ResourceRecord{
 			resourceRecord,
 		},
 	}
 	change := types.Change{
-		Action:            types.ChangeActionUpsert,
+		Action:            types.ChangeAction(action),
 		ResourceRecordSet: &resourceRecordSet,
+	}
+	changes := []types.Change{
+		change,
 	}
 	changeBatch := types.ChangeBatch{
 		Comment: &comment,
-		Changes: []types.Change{
-			change,
-		},
+		Changes: changes,
 	}
 
 	createRecordInput := &route53.ChangeResourceRecordSetsInput{
@@ -105,8 +111,4 @@ func dns_add_route53(fqdn string, challenge string) {
 		fmt.Println("unable to create record, ", err)
 		os.Exit(1)
 	}
-}
-
-func dns_remove_route53(fqdn string, challenge string) {
-	fmt.Print("dns_remove_route53")
 }

@@ -72,6 +72,7 @@ var initialize bool
 var force bool
 var updateBeforeDay int
 var letsEncryptEnvironment string
+var dnsValidation bool
 
 func main() {
 	flag.StringVar(&yamlFile, "f", "config.yml", "Path to the YAML file containing info. default '-f config.yml'")
@@ -80,6 +81,7 @@ func main() {
 	flag.BoolVar(&force, "force", false, "Force cert update even if it is not expired. default '-force=false'")
 	flag.IntVar(&updateBeforeDay, "update-before-day", 3, "Update before date. default '-update-before-day 3'")
 	flag.StringVar(&letsEncryptEnvironment, "lets-encrypt-environment", "production", "Let's Encrypt environment production or staging. default '-lets-encrypt-environment production'")
+	flag.BoolVar(&dnsValidation, "dns-validation", false, "DNS validation. default '-dns-validation=false'")
 	flag.Parse()
 
 	if yamlFile == "" {
@@ -128,6 +130,14 @@ func main() {
 				fmt.Println("Output: \n", string(output))
 			}
 		}
+
+		if dnsValidation {
+			fmt.Println("DNS Validation")
+			replaceStringInFile("/root/.getssl/getssl.cfg", "#VALIDATE_VIA_DNS=\"true\"", "VALIDATE_VIA_DNS=\"true\"")
+			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_ADD_COMMAND=", "DNS_ADD_COMMAND=\"/root/dns_add_route53\"")
+			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_DEL_COMMAND=", "DNS_DEL_COMMAND=\"/root/dns_remove_route53\"")
+		}
+
 		os.Exit(0)
 	}
 

@@ -5,6 +5,13 @@ COPY main.go ./
 RUN go mod download
 RUN go build -ldflags="-w -s" -o ./create-cert ./main.go
 
+FROM golang:1.23.1-alpine3.19 as dns_edit_route53
+WORKDIR /tmp/dns_edit_route53
+COPY route53/go.mod route53/go.sum ./
+COPY route53/dns_edit_route53.go ./
+RUN go mod download
+RUN go build -ldflags="-w -s" -o ./dns_edit_route53 ./dns_edit_route53.go
+
 FROM alpine:3.20.3
 
 # Install necessary packages
@@ -29,6 +36,8 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
 RUN mkdir -p /var/www/html/.well-known/acme-challenge && chmod 777 /var/www/html/.well-known/acme-challenge
 
 COPY --from=create-cert /tmp/create-cert/create-cert /tmp/create-cert
+
+COPY --from=dns_edit_route53 /tmp/dns_edit_route53/dns_edit_route53 /tmp/dns_edit_route53
 
 COPY ./init.sh /tmp/init.sh
 RUN chmod +x /tmp/init.sh
