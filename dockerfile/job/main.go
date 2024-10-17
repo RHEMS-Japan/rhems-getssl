@@ -132,7 +132,10 @@ func main() {
 		}
 
 		if dnsValidation {
-			fmt.Println("DNS Validation")
+			if letsEncryptEnvironment == "production" {
+				replaceStringInFile("/root/.getssl/getssl.cfg", "CA=\"https://acme-staging-v02.api.letsencrypt.org\"", "CA=\"https://acme-v02.api.letsencrypt.org\"")
+			}
+			replaceStringInFile("/root/.getssl/getssl.cfg", "#VALIDATE_VIA_DNS=\"true\"", "VALIDATE_VIA_DNS=\"true\"")
 			replaceStringInFile("/root/.getssl/getssl.cfg", "#VALIDATE_VIA_DNS=\"true\"", "VALIDATE_VIA_DNS=\"true\"")
 			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_ADD_COMMAND=", "DNS_ADD_COMMAND=\"/root/dns_add_route53\"")
 			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_DEL_COMMAND=", "DNS_DEL_COMMAND=\"/root/dns_remove_route53\"")

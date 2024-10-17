@@ -6,10 +6,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
 	"github.com/aws/aws-sdk-go-v2/service/route53/types"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"time"
 )
 
 var basename string
@@ -25,6 +27,7 @@ func main() {
 	case "dns_add_route53":
 		fmt.Println("dns_add_route53")
 		edit_route53("UPSERT", fqdn, challenge)
+		waitAvaliable(fqdn, challenge)
 		break
 	case "dns_remove_route53":
 		fmt.Println("dns_remove_route53")
@@ -72,7 +75,7 @@ func edit_route53(action string, fqdn string, challenge string) {
 		os.Exit(1)
 	}
 
-	challengeFqdn := fmt.Sprintf("\"_acme-challenge.%s\"", fqdn)
+	challengeFqdn := fmt.Sprintf("_acme-challenge.%s", fqdn)
 	fmt.Println("challengeFqdn: ", challengeFqdn)
 	value := fmt.Sprintf("\"%s\"", challenge)
 	fmt.Println("value: ", value)
@@ -106,9 +109,33 @@ func edit_route53(action string, fqdn string, challenge string) {
 		ChangeBatch:  &changeBatch,
 	}
 
-	_, err = route53Client.ChangeResourceRecordSets(context.TODO(), createRecordInput)
+	output, err := route53Client.ChangeResourceRecordSets(context.TODO(), createRecordInput)
 	if err != nil {
 		fmt.Println("unable to create record, ", err)
 		os.Exit(1)
+	}
+
+	fmt.Println(*output.ChangeInfo.Id)
+	fmt.Println(output.ChangeInfo.Status)
+	fmt.Println(*output.ChangeInfo.SubmittedAt)
+}
+
+func waitAvaliable(fqdn string, challenge string) {
+	for {
+		texts, err := net.LookupTXT(fmt.Sprintf("_acme-challenge.%s", fqdn))
+		if err == nil {
+			for _, addr := range texts {
+				fmt.Println(addr)
+				if addr == fmt.Sprintf("\"%s\"", challenge) {
+					fmt.Println("DNS is available")
+					os.Exit(0)
+				}
+			}
+			break
+		} else {
+			fmt.Println("Waiting for DNS to be available")
+			fmt.Println(err)
+		}
+		time.Sleep(10 * time.Second)
 	}
 }
