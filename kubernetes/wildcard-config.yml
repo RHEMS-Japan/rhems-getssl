@@ -1,9 +1,0 @@
-info:
-  - wildcard_domain: "*.test-getssl.rhems-labs.org"
-    check_domains:
-      - "cert.test-getssl.rhems-labs.org"
-    ingresses:
-      - namespace: yutaro-test
-        ingress_name: rhems-getssl-ingress
-      - namespace: yutaro-test
-        ingress_name: rhems-getssl-ingress-2

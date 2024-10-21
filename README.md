@@ -302,6 +302,281 @@ rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
 
 ### 1. 準備
 
+dockerfile/goやdockerfile/jobにてイメージbuildを行い各種レジストリサービスにPushしてください。
+```bash
+$ cd dockerfile/go
+$ docker build -t rhems-getssl-go:latest -f go.Dockerfile ./
+$ cd dockerfile/job
+$ docker build -t rhems-getssl-job:latest -f job.Dockerfile ./ 
+```
+
+イメージのPushが完了したらkubernetes/kustomization.ymlのimagesの部分を修正してください。
+```yaml
+images:
+  - name: rhems-getssl-go
+    newName: レジストリURI/リポジトリ名
+    digest: sha256:aaabbbcccddd
+  - name: rhems-getssl-job
+    newName: レジストリURI/リポジトリ名
+    digest: sha256:aaabbbcccddd
+```
+
+
+kubernetesのcronjob.ymlにてクラウドサービスやrhems-badgeの各種変数を設定してください。
+```yaml
+# 一部抜粋
+spec:
+  timeZone: Asia/Tokyo
+  schedule: "0 0 * * *" # cronの設定
+  jobTemplate:
+    spec:
+      template:
+        spec:          
+          initContainers:
+            - name: init-getssl
+              image: rhems-getssl-job
+              imagePullPolicy: IfNotPresent
+              command:
+                - ./create-cert
+              args:
+                - '-i=true'
+                - '-f'
+                - '/root/config.yml'
+                - '-dns-validation=true' # DNS-01 チャレンジのためこのオプションを追加してください。
+              env:
+                - name: TZ
+                  value: Asia/Tokyo
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: API_TOKEN
+                  value: __BADGE_API_TOKEN__ # rhems-badgeのAPIトークン
+                - name: ORGANIZATION
+                  value: __ORGANIZATION__ # organization名
+                - name: REPO
+                  value: __REPO__ # repo名
+                - name: APP
+                  value: __APP__ # app名
+                - name: BRANCH
+                  value: __BRANCH__ # branch名
+                - name: CRON
+                  value: "0 15 * * *" # badgesでのcronの設定 Etc/UTCなのでマニフェストの時間との違いに注意してください。
+                - name: GRACE_TIME
+                  value: "10" # cronの実行時間を考慮したグレースタイム
+                - name: SLACK_FAILED
+                  value: __SLACK_FAILED__ # slackの通知先
+                - name: SLACK_SUCCESS
+                  value: __SLACK_SUCCESS__ # slackの通知先
+          containers:
+            - name: rhems-getssl
+              image: rhems-getssl-job
+              imagePullPolicy: IfNotPresent
+              command:
+                - ./create-cert
+              args:
+                - '-c'
+                - 'aws' # 証明書をアップロードするクラウドサービス aws or tencent
+                - '-dns-validation=true' # DNS-01 チャレンジのためこのオプションを追加してください。
+                - '-force=true' #　強制的に証明書を取得し更新する場合はこのオプションを追加してください。
+                - '-update-before-day=30' # 有効期限から何日前以内に更新するかを設定する場合はこのオプションを追加してください。　デフォルトでは3日前に更新します。
+              env:
+                - name: TZ
+                  value: Asia/Tokyo
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: API_TOKEN
+                  value: __BADGE_API_TOKEN__ # rhems-badgeのAPIトークン
+                - name: ORGANIZATION
+                  value: __ORGANIZATION__ # organization名
+                - name: REPO
+                  value: __REPO__ # repo名
+                - name: APP
+                  value: __APP__ # app名
+                - name: BRANCH
+                  value: __BRANCH__ # branch名
+                - name: CRON
+                  value: "0 15 * * *" # badgesでのcronの設定 Etc/UTCなのでマニフェストの時間との違いに注意してください。
+                - name: GRACE_TIME
+                  value: "10" # cronの実行時間を考慮したグレースタイム
+                - name: SLACK_FAILED
+                  value: __SLACK_FAILED__ # slackの通知先
+                - name: SLACK_SUCCESS
+                  value: __SLACK_SUCCESS__ # slackの通知先
+```
+
+kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。
+```yaml
+# tencentの場合
+info:
+  - wildcard_domain: "*.test-getssl.rhems-labs.org"
+    check_domains:
+      - "cert.test-getssl.rhems-labs.org"
+    secrets:
+      - namespace: yutaro-test
+        secret_name: rhems-getssl-cert
+      - namespace: yutaro-test
+        secret_name: rhems-getssl-cert-2
+      - namespace: yutaro-test
+        secret_name: rhems-getssl-cert-3
+---
+# awsの場合
+info:
+  - wildcard_domain: "*.test-getssl.rhems-labs.org"
+    check_domains:
+      - "cert.test-getssl.rhems-labs.org"
+    ingresses:
+      - namespace: yutaro-test
+        ingress_name: rhems-getssl-ingress
+      - namespace: yutaro-test
+        ingress_name: rhems-getssl-ingress-2
+      - namespace: yutaro-test
+        ingress_name: rhems-getssl-ingress-3
+```
+
+kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
+Tencentの場合でもRoute53にドメインを登録するためにAWSのKey/Secが必要です。
+```yaml
+# awsの場合
+apiVersion: v1
+kind: Secret
+metadata:
+  name: env
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: __AWS_ACCESS_KEY_ID__ # AWSのアクセスキー
+  AWS_SECRET_ACCESS_KEY: __AWS_SECRET_ACCESS_KEY__ # AWSのシークレットキー
+  AWS_DEFAULT_REGION: __AWS_DEFAULT_REGION__ # AWSのリージョン
+  AWS_DEFAULT_OUTPUT: json # AWSの出力形式
+---
+# tencentの場合
+apiVersion: v1
+kind: Secret
+metadata:
+  name: env
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: __AWS_ACCESS_KEY_ID__ # AWSのアクセスキー
+  AWS_SECRET_ACCESS_KEY: __AWS_SECRET_ACCESS_KEY__ # AWSのシークレットキー
+  AWS_DEFAULT_REGION: __AWS_DEFAULT_REGION__ # AWSのリージョン
+  AWS_DEFAULT_OUTPUT: json # AWSの出力形式
+  TENCENTCLOUD_SECRET_ID: __TENCENTCLOUD_SECRET_ID__
+  TENCENTCLOUD_SECRET_KEY: __TENCETCLOUD_SECRET_KEY__
+  TENCENTCLOUD_REGION: __TENCENTCLOUD_REGION__
+```
+
+kubernetes/rbac.ymlにて各種権限を設定してください。
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: getssl-job
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubectl-role-binding-getssl-job
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin # 権限を設定してください
+subjects:
+  - name: getssl-job
+    kind: ServiceAccount
+    namespace: yutaro-test # namespace名
+```
+
+kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。
+```yaml
+# 一部抜粋
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: yutaro-test # namespace名
+
+resources:
+  - cronjob.yml
+  - env.yml
+  - go.yml
+  - svc.yml
+  - ingress.yml
+  - rbac.yml
+
+images:
+  - name: rhems-getssl-go
+    newName: registry.example/rhems-getssl # レジストリURI/リポジトリ名
+    digest: sha256:aaaannnnccccsssskkkk # イメージのdigest
+  - name: rhems-getssl-job
+    newName: registry.example/rhems-getssl # レジストリURI/リポジトリ名
+    digest: sha256:llllooooppppzzzzqqqq # イメージのdigest
+```
+
+### 2. デプロイ
+
+kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。
+```bash
+$ kubectl kustomize .
+```
+
+GoサーバーPodの起動のため、先にfile-name.ymlとacme-challenge.ymlをapplyしてください。
+```bash
+$ kubectl apply -f file-name.yml
+$ kubectl apply -f acme-challenge.yml
+```
+
+問題が無ければkubectl applyコマンドを実行してください。
+```bash
+$ kubectl apply -k .
+```
+
+取得したいドメインを受け持つIngressより/.well-known/acme-challenge/以下のリクエストをPodに転送するように設定してください。
+```yaml
+# awsの場合
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /.well-known/acme-challenge/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: rhems-getssl-svc
+                port:
+                  number: 80
+---
+# tencentの場合
+spec:
+  rules:
+    - host: test-getssl.rhems-labs.org
+      http:
+        paths:
+          - path: /.well-known/acme-challenge
+            pathType: Prefix
+            backend:
+              service:
+                name: rhems-getssl-svc
+                port:
+                  number: 80
+```
+
+### 3. 確認
+
+Cronjobを手動で実行しエラー無く完了するかどうか確認を行って下さい。
+```bash
+$ kubectl get cronjob
+NAME           SCHEDULE    SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+rhems-getssl   0 0 * * *   False     0        <none>          8m34s
+$ kubectl create job --from=cronjob/rhems-getssl rhems-getssl-manual-123456
+job.batch/rhems-getssl-manual-123456 created
+$ kubectl get pod
+NAME                               READY   STATUS      RESTARTS   AGE
+rhems-getssl-go-6559dbf796-ssz4z   1/1     Running     0          5m50s
+rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
+```
+
 ## まだSSL証明書が設定されていない環境で最初からrhems-getsslを使用する場合
 
 まだ対象ドメインに対しhttps接続が行えない場合、cronjob.ymlにて`-force=true`オプションを追加し実行してください。

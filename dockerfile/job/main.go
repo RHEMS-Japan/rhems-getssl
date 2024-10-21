@@ -154,7 +154,10 @@ func main() {
 		fmt.Println("Server Deployment Name is not provided. use default name 'rhems-getssl-go'.")
 		config.ServerDeploymentName = "rhems-getssl-go"
 	}
-	editDeployment(0, clientSet, os.Getenv("POD_NAMESPACE"), config.ServerDeploymentName)
+
+	if !dnsValidation {
+		editDeployment(0, clientSet, os.Getenv("POD_NAMESPACE"), config.ServerDeploymentName)
+	}
 	postToBadges(os.Getenv("BRANCH"), true, "All certificates are up to date", "All certificates are up to date", 0)
 }
 
