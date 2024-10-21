@@ -31,9 +31,14 @@ import (
 	"time"
 )
 
+type Secret struct {
+	Namespace  string `yaml:"namespace"`
+	SecretName string `yaml:"secret_name"`
+}
+
 type Ingress struct {
 	Namespace   string `yaml:"namespace"`
-	ingressName string `yaml:"ingress_name"`
+	IngressName string `yaml:"ingress_name"`
 }
 
 type Info struct {
@@ -44,6 +49,7 @@ type Info struct {
 	WildcardDomain string    `yaml:"wildcard_domain"`
 	CheckDomains   []string  `yaml:"check_domains"`
 	Ingresses      []Ingress `yaml:"ingresses"`
+	Secrets        []Secret  `yaml:"secrets"`
 }
 
 type Config struct {
@@ -122,12 +128,12 @@ func main() {
 					if checkCertValidation(checkDomain) {
 						continue
 					} else {
-						createCert(info, info.WildcardDomain, clientSet)
+						createWildCert(info, info.WildcardDomain, clientSet)
 						break
 					}
 				}
 			} else {
-				createCert(info, info.WildcardDomain, clientSet)
+				createWildCert(info, info.WildcardDomain, clientSet)
 			}
 		} else {
 			for _, domain := range info.Domains {
@@ -173,6 +179,17 @@ func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 			if err != nil {
 				fmt.Println(err.Error())
 				postToBadges(domain, false, "init.sh error", string(output), 0)
+				os.Exit(1)
+			}
+			fmt.Println("Output: \n", string(output))
+		}
+
+		if info.WildcardDomain != "" {
+			cmd := exec.Command("/tmp/init.sh", info.WildcardDomain, letsEncryptEnvironment)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				fmt.Println(err.Error())
+				postToBadges(info.WildcardDomain, false, "init.sh error", string(output), 0)
 				os.Exit(1)
 			}
 			fmt.Println("Output: \n", string(output))
@@ -227,7 +244,7 @@ func initKubeClient() *kubernetes.Clientset {
 	return clientSet
 }
 
-func uploadCert(domain string, cloud string, secretName string, ingressName string, namespace string, clientSet *kubernetes.Clientset) {
+func uploadCert(domain string, cloud string) string {
 	certPath := fmt.Sprintf("/root/.getssl/%s/%s.crt", domain, domain)
 	fullCertChainPath := fmt.Sprintf("/root/.getssl/%s/%s_chain.pem", domain, domain)
 	privateKeyPath := fmt.Sprintf("/root/.getssl/%s/%s.key", domain, domain)
@@ -263,18 +280,22 @@ func uploadCert(domain string, cloud string, secretName string, ingressName stri
 		fmt.Println("Certificate uploaded successfully")
 		fmt.Println("Certificate ARN: ", *arn)
 
-		editIngress(domain, clientSet, namespace, ingressName, *arn)
+		return *arn
 
-		postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+*arn, 0)
+		//editIngress(domain, clientSet, namespace, ingressName, *arn)
+		//
+		//postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+*arn, 0)
 	} else {
 		response := uploadCertTencent(domain, fullCertChain, privateKey)
 
 		fmt.Println("Certificate uploaded successfully")
 		fmt.Println("Certificate response: ", response.ToJsonString())
 
-		editCertSecret(domain, *response.Response.CertificateId, secretName, namespace, clientSet)
+		return *response.Response.CertificateId
 
-		postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+*response.Response.CertificateId, 0)
+		//editCertSecret(domain, *response.Response.CertificateId, secretName, namespace, clientSet)
+		//
+		//postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+*response.Response.CertificateId, 0)
 	}
 }
 
@@ -337,22 +358,17 @@ func uploadCertTencent(domain string, certificate []byte, privateKey []byte) *ss
 	return response
 }
 
-func editCertSecret(domain string, certificateId string, secretName string, namespace string, clientSet *kubernetes.Clientset) {
-	secretInterface := clientSet.CoreV1().Secrets(namespace)
+func editCertSecret(domain string, certificateId string, secretName string, namespace string) {
+	exec.Command("rm", "secret.yml").Run()
+	exec.Command("cp", "secret-base.yml", "secret.yml").Run()
+	replaceStringInFile("secret.yml", "__SECRET_NAME__", secretName)
+	replaceStringInFile("secret.yml", "__QCLOUD_CERT_ID__", b64.StdEncoding.EncodeToString([]byte(certificateId)))
 
-	var certIdBase64 string = b64.StdEncoding.EncodeToString([]byte(certificateId))
-	secretPatch := []byte(fmt.Sprintf(`{"data":{"qcloud_cert_id":"%s"}}`, certIdBase64))
-
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		_, updateErr := secretInterface.Patch(context.TODO(), secretName, types.StrategicMergePatchType, secretPatch, metav1.PatchOptions{})
-		return updateErr
-	})
-	if retryErr != nil {
-		fmt.Printf("Error updating ingress %s: %v\n", secretName, retryErr)
-		postToBadges(domain, false, "secret patch error", retryErr.Error(), 0)
+	err := exec.Command("kubectl", "apply", "-f", "secret.yml", "-n", namespace).Run()
+	if err != nil {
+		fmt.Println(err.Error())
+		postToBadges(domain, false, "secret,yml apply error", err.Error(), 0)
 		os.Exit(1)
-	} else {
-		fmt.Printf("Secret %s updated successfully\n", secretName)
 	}
 }
 
@@ -537,7 +553,8 @@ func createCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 	if match {
 		fmt.Println("Certificate created successfully\ncertificate upload to cert manager")
 
-		uploadCert(domain, cloud, info.SecretName, info.IngressName, info.Namespace, clientSet)
+		certId := uploadCert(domain, cloud)
+		applyCertToIngress(certId, domain, clientSet, info.Namespace, info.IngressName, info.SecretName)
 	} else {
 		find := exec.Command("find", "/var/www/html/.well-known/acme-challenge/", "-maxdepth", "1", "-type", "f")
 		findOut, _ := find.CombinedOutput()
@@ -605,11 +622,52 @@ func createCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 
 		if matchAgain {
 			fmt.Println("Certificate creation successful")
-			uploadCert(domain, cloud, info.SecretName, info.IngressName, info.Namespace, clientSet)
+			certId := uploadCert(domain, cloud)
+			applyCertToIngress(certId, domain, clientSet, info.Namespace, info.IngressName, info.SecretName)
 		} else {
 			fmt.Println("Certificate creation failed")
 			postToBadges(domain, false, "Certificate creation failed", getsslAgainOutput, 0)
 			os.Exit(1)
 		}
+	}
+}
+
+func createWildCert(info Info, domain string, clientSet *kubernetes.Clientset) {
+	fmt.Println("Domain: ", domain)
+
+	getssl := exec.Command("./getssl", "-f", domain)
+	out, _ := getssl.CombinedOutput()
+
+	fmt.Println("Output: ", string(out))
+	var getsslOutput string = string(out)
+
+	pattern := `.*Verification\scompleted,\sobtaining\scertificate.*`
+	match, _ := regexp.MatchString(pattern, getsslOutput)
+
+	if match {
+		fmt.Println("Certificate created successfully\ncertificate upload to cert manager")
+		certId := uploadCert(domain, cloud)
+		for _, ingress := range info.Ingresses {
+			applyCertToIngress(certId, domain, clientSet, ingress.Namespace, ingress.IngressName, "")
+		}
+		for _, secret := range info.Secrets {
+			applyCertToIngress(certId, domain, clientSet, secret.Namespace, "", secret.SecretName)
+		}
+	} else {
+		fmt.Println("Certificate creation failed")
+		postToBadges(domain, false, "Certificate creation failed", getsslOutput, 0)
+		os.Exit(1)
+	}
+}
+
+func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clientset, namespace string, ingressName string, secretName string) {
+	if cloud == "aws" {
+		fmt.Println("Certificate ARN: ", certId)
+		editIngress(domain, clientSet, namespace, ingressName, certId)
+		postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
+	} else {
+		fmt.Println("Certificate ID: ", certId)
+		editCertSecret(domain, certId, secretName, namespace)
+		postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
 	}
 }

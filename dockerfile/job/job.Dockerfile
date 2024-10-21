@@ -45,6 +45,7 @@ RUN chmod +x /tmp/init.sh
 COPY ./account-key-base.yml /tmp/configmap/account-key-base.yml
 COPY ./acme-challenge-base.yml /tmp/configmap/acme-challenge-base.yml
 COPY ./file-name-base.yml /tmp/configmap/file-name-base.yml
+COPY ./secret-base.yml /tmp/configmap/secret-base.yml
 RUN chmod 777 /tmp/configmap/account-key-base.yml
 RUN chmod 777 /tmp/configmap/acme-challenge-base.yml
 RUN chmod 777 /tmp/configmap/file-name-base.yml

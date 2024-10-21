@@ -6,7 +6,7 @@ Let's Encryptを使用して無料証明書を取得し各種証明書管理サ�
 
 acme-challengeのためのファイルを公開するGoサーバーPodと、証明書の取得を行うCronJobの2つで構成されています。
 
-## 使用方法
+## 使用方法 HTTP-01 チャレンジの場合
 
 ### 1. 準備
 
@@ -297,6 +297,10 @@ NAME                               READY   STATUS      RESTARTS   AGE
 rhems-getssl-go-6559dbf796-ssz4z   1/1     Running     0          5m50s
 rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
 ```
+
+## 使用方法 DNS-01 チャレンジの場合
+
+### 1. 準備
 
 ## まだSSL証明書が設定されていない環境で最初からrhems-getsslを使用する場合
 
