@@ -31,11 +31,19 @@ import (
 	"time"
 )
 
+type Ingress struct {
+	Namespace   string `yaml:"namespace"`
+	ingressName string `yaml:"ingress_name"`
+}
+
 type Info struct {
-	Namespace   string   `yaml:"namespace"`
-	IngressName string   `yaml:"ingress_name"`
-	SecretName  string   `yaml:"secret_name"`
-	Domains     []string `yaml:"domains"`
+	Namespace      string    `yaml:"namespace"`
+	IngressName    string    `yaml:"ingress_name"`
+	SecretName     string    `yaml:"secret_name"`
+	Domains        []string  `yaml:"domains"`
+	WildcardDomain string    `yaml:"wildcard_domain"`
+	CheckDomains   []string  `yaml:"check_domains"`
+	Ingresses      []Ingress `yaml:"ingresses"`
 }
 
 type Config struct {
@@ -57,13 +65,6 @@ type Badges struct {
 	SlackSuccess string `json:"slack_success"`
 	Msg          string `json:"msg"`
 	Log          string `json:"log"`
-}
-
-type Cert struct {
-	ExpireTime    time.Time
-	ExpireJSTTime time.Time
-	ExpireDate    string
-	ExpireJSTDate string
 }
 
 var yamlFile string
@@ -107,41 +108,7 @@ func main() {
 	clientSet := initKubeClient()
 
 	if initialize {
-		fmt.Println("Initialize")
-		if config.ServerDeploymentName == "" {
-			fmt.Println("Server Deployment Name is not provided. use default name 'rhems-getssl-go'.")
-			config.ServerDeploymentName = "rhems-getssl-go"
-		}
-		editDeployment(1, clientSet, os.Getenv("POD_NAMESPACE"), config.ServerDeploymentName)
-		for _, info := range config.Info {
-			fmt.Println("Namespace: ", info.Namespace)
-			fmt.Println("Ingress Name: ", info.IngressName)
-			fmt.Println("Secret Name: ", info.SecretName)
-			fmt.Println("Domains: ", info.Domains)
-
-			for _, domain := range info.Domains {
-				cmd := exec.Command("/tmp/init.sh", domain, letsEncryptEnvironment)
-				output, err := cmd.CombinedOutput()
-				if err != nil {
-					fmt.Println(err.Error())
-					postToBadges(domain, false, "init.sh error", string(output), 0)
-					os.Exit(1)
-				}
-				fmt.Println("Output: \n", string(output))
-			}
-		}
-
-		if dnsValidation {
-			if letsEncryptEnvironment == "production" {
-				replaceStringInFile("/root/.getssl/getssl.cfg", "CA=\"https://acme-staging-v02.api.letsencrypt.org\"", "CA=\"https://acme-v02.api.letsencrypt.org\"")
-			}
-			replaceStringInFile("/root/.getssl/getssl.cfg", "#VALIDATE_VIA_DNS=\"true\"", "VALIDATE_VIA_DNS=\"true\"")
-			replaceStringInFile("/root/.getssl/getssl.cfg", "#VALIDATE_VIA_DNS=\"true\"", "VALIDATE_VIA_DNS=\"true\"")
-			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_ADD_COMMAND=", "DNS_ADD_COMMAND=\"/root/dns_add_route53\"")
-			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_DEL_COMMAND=", "DNS_DEL_COMMAND=\"/root/dns_remove_route53\"")
-		}
-
-		os.Exit(0)
+		initGetssl(config, clientSet)
 	}
 
 	for _, info := range config.Info {
@@ -149,117 +116,32 @@ func main() {
 		fmt.Println("Ingress Name: ", info.IngressName)
 		fmt.Println("Domains: ", info.Domains)
 
-		for _, domain := range info.Domains {
+		if info.WildcardDomain != "" {
 			if !force {
-				cert := checkCertValidation(domain)
-				fmt.Println("Domain: ", domain)
-				fmt.Println("Expire Time: ", cert.ExpireTime)
-				fmt.Println("Expire JST Time: ", cert.ExpireJSTTime)
-				fmt.Println("Expire Date: ", cert.ExpireDate)
-				fmt.Println("Expire JST Date: ", cert.ExpireJSTDate)
-				fmt.Println("Update Before Day: ", updateBeforeDay)
-				fmt.Println("しきい値: ", cert.ExpireTime.Add(-24*time.Duration(updateBeforeDay)*time.Hour))
-
-				if time.Now().After(cert.ExpireTime.Add(-24 * time.Duration(updateBeforeDay) * time.Hour)) {
-					fmt.Println("Certificate needs to be updated")
-				} else {
-					fmt.Println("Certificate is still valid")
-					postToBadges(domain, true, "Certificate is still valid", fmt.Sprintf("Expire Date: %s", cert.ExpireDate), 0)
-					continue
+				for _, checkDomain := range info.CheckDomains {
+					if checkCertValidation(checkDomain) {
+						continue
+					} else {
+						createCert(info, info.WildcardDomain, clientSet)
+						break
+					}
 				}
 			} else {
-				fmt.Println("Domain: ", domain)
+				createCert(info, info.WildcardDomain, clientSet)
 			}
-
-			getssl := exec.Command("./getssl", "-f", domain)
-			out, _ := getssl.CombinedOutput()
-
-			fmt.Println("Output: ", string(out))
-			var getsslOutput string = string(out)
-
-			pattern := `.*Verification\scompleted,\sobtaining\scertificate.*`
-			match, _ := regexp.MatchString(pattern, getsslOutput)
-
-			if match {
-				fmt.Println("Certificate created successfully\ncertificate upload to cert manager")
-
-				uploadCert(domain, cloud, info.SecretName, info.IngressName, info.Namespace, clientSet)
-			} else {
-				find := exec.Command("find", "/var/www/html/.well-known/acme-challenge/", "-maxdepth", "1", "-type", "f")
-				findOut, _ := find.CombinedOutput()
-				fmt.Println("Output: ", string(findOut))
-				var fullpath string = string(findOut)
-				fmt.Println("fullpath: ", fullpath)
-				basename := filepath.Base(fullpath)
-				content, err := os.ReadFile(strings.TrimSuffix(fullpath, "\n"))
-				if err != nil {
-					fmt.Println(err.Error())
-					postToBadges(domain, false, "acme-challenge file read error", err.Error(), 0)
-					os.Exit(1)
-				}
-
-				fmt.Println("content: ", string(content))
-
-				exec.Command("cp", "acme-challenge-base.yml", "acme-challenge.yml").Run()
-				exec.Command("cp", "file-name-base.yml", "file-name.yml").Run()
-				replaceStringInFile("acme-challenge.yml", "__FILE_NAME__", basename)
-				replaceStringInFile("acme-challenge.yml", "__CONTENT__", string(content))
-				replaceStringInFile("file-name.yml", "__FILE_NAME__", basename)
-
-				err = exec.Command("kubectl", "delete", "configmap", "acme-challenge", "-n", os.Getenv("POD_NAMESPACE")).Run()
-				if err != nil {
-					fmt.Println(err.Error())
-					postToBadges(domain, false, "acme-challenge configmap delete error", err.Error(), 0)
-					os.Exit(1)
-				}
-				err = exec.Command("kubectl", "delete", "configmap", "file-name", "-n", os.Getenv("POD_NAMESPACE")).Run()
-				if err != nil {
-					fmt.Println(err.Error())
-					postToBadges(domain, false, "file-name configmap delete error", err.Error(), 0)
-					os.Exit(1)
-				}
-				err = exec.Command("kubectl", "apply", "-f", "acme-challenge.yml", "-n", os.Getenv("POD_NAMESPACE")).Run()
-				if err != nil {
-					fmt.Println(err.Error())
-					postToBadges(domain, false, "acme-challenge configmap apply error", err.Error(), 0)
-					os.Exit(1)
-				}
-				err = exec.Command("kubectl", "apply", "-f", "file-name.yml", "-n", os.Getenv("POD_NAMESPACE")).Run()
-				if err != nil {
-					fmt.Println(err.Error())
-					postToBadges(domain, false, "file-name configmap apply error", err.Error(), 0)
-					os.Exit(1)
-				}
-				err = exec.Command("kubectl", "rollout", "restart", "deployment", "rhems-getssl-go", "-n", os.Getenv("POD_NAMESPACE")).Run()
-				if err != nil {
-					fmt.Println(err.Error())
-					postToBadges(domain, false, "rhems-getssl-go deployment restart error", err.Error(), 0)
-					os.Exit(1)
-				}
-
-				var url string = fmt.Sprintf("http://%s/.well-known/acme-challenge/%s", domain, basename)
-				waitAvailable(url, string(content))
-
-				getsslAgain := exec.Command("./getssl", "-f", domain)
-				getsslAgainOut, _ := getsslAgain.CombinedOutput()
-
-				fmt.Println("Output: ", string(getsslAgainOut))
-				var getsslAgainOutput string = string(getsslAgainOut)
-
-				patternAgain := `.*Certificate\ssaved\sin.*`
-				matchAgain, _ := regexp.MatchString(patternAgain, getsslAgainOutput)
-
-				if matchAgain {
-					fmt.Println("Certificate creation successful")
-					uploadCert(domain, cloud, info.SecretName, info.IngressName, info.Namespace, clientSet)
+		} else {
+			for _, domain := range info.Domains {
+				if !force {
+					if checkCertValidation(domain) {
+						continue
+					} else {
+						createCert(info, domain, clientSet)
+					}
 				} else {
-					fmt.Println("Certificate creation failed")
-					postToBadges(domain, false, "Certificate creation failed", getsslAgainOutput, 0)
-					os.Exit(1)
+					createCert(info, domain, clientSet)
 				}
 			}
 		}
-
 	}
 
 	if config.ServerDeploymentName == "" {
@@ -268,6 +150,46 @@ func main() {
 	}
 	editDeployment(0, clientSet, os.Getenv("POD_NAMESPACE"), config.ServerDeploymentName)
 	postToBadges(os.Getenv("BRANCH"), true, "All certificates are up to date", "All certificates are up to date", 0)
+}
+
+func initGetssl(config Config, clientSet *kubernetes.Clientset) {
+	fmt.Println("Initialize")
+	if config.ServerDeploymentName == "" {
+		fmt.Println("Server Deployment Name is not provided. use default name 'rhems-getssl-go'.")
+		config.ServerDeploymentName = "rhems-getssl-go"
+	}
+	if !dnsValidation {
+		editDeployment(1, clientSet, os.Getenv("POD_NAMESPACE"), config.ServerDeploymentName)
+	}
+	for _, info := range config.Info {
+		fmt.Println("Namespace: ", info.Namespace)
+		fmt.Println("Ingress Name: ", info.IngressName)
+		fmt.Println("Secret Name: ", info.SecretName)
+		fmt.Println("Domains: ", info.Domains)
+
+		for _, domain := range info.Domains {
+			cmd := exec.Command("/tmp/init.sh", domain, letsEncryptEnvironment)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				fmt.Println(err.Error())
+				postToBadges(domain, false, "init.sh error", string(output), 0)
+				os.Exit(1)
+			}
+			fmt.Println("Output: \n", string(output))
+		}
+	}
+
+	if dnsValidation {
+		if letsEncryptEnvironment == "production" {
+			replaceStringInFile("/root/.getssl/getssl.cfg", "CA=\"https://acme-staging-v02.api.letsencrypt.org\"", "CA=\"https://acme-v02.api.letsencrypt.org\"")
+		}
+		replaceStringInFile("/root/.getssl/getssl.cfg", "#VALIDATE_VIA_DNS=\"true\"", "VALIDATE_VIA_DNS=\"true\"")
+		replaceStringInFile("/root/.getssl/getssl.cfg", "#VALIDATE_VIA_DNS=\"true\"", "VALIDATE_VIA_DNS=\"true\"")
+		replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_ADD_COMMAND=", "DNS_ADD_COMMAND=\"/root/dns_add_route53\"")
+		replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_DEL_COMMAND=", "DNS_DEL_COMMAND=\"/root/dns_remove_route53\"")
+	}
+
+	os.Exit(0)
 }
 
 func initKubeClient() *kubernetes.Clientset {
@@ -568,7 +490,7 @@ func postToBadges(app string, status bool, msg string, log string, count int) {
 	}
 }
 
-func checkCertValidation(url string) *Cert {
+func checkCertValidation(url string) bool {
 	res, err := http.Get("https://" + url)
 
 	if err != nil {
@@ -582,10 +504,112 @@ func checkCertValidation(url string) *Cert {
 	expireDate := fmt.Sprintf("%s UTC", expireTime.Format("2006-01-02 15:04:05"))
 	expireJSTDate := fmt.Sprintf("%s JST", expireJSTTime.Format("2006-01-02 15:04:05"))
 
-	return &Cert{
-		ExpireTime:    expireTime,
-		ExpireJSTTime: expireJSTTime,
-		ExpireDate:    expireDate,
-		ExpireJSTDate: expireJSTDate,
+	fmt.Println("Domain: ", url)
+	fmt.Println("Expire Time: ", expireTime)
+	fmt.Println("Expire JST Time: ", expireJSTTime)
+	fmt.Println("Expire Date: ", expireDate)
+	fmt.Println("Expire JST Date: ", expireJSTDate)
+	fmt.Println("Update Before Day: ", updateBeforeDay)
+	fmt.Println("しきい値: ", expireTime.Add(-24*time.Duration(updateBeforeDay)*time.Hour))
+
+	if time.Now().After(expireTime.Add(-24 * time.Duration(updateBeforeDay) * time.Hour)) {
+		fmt.Println("Certificate needs to be updated")
+		return false
+	} else {
+		fmt.Println("Certificate is still valid")
+		postToBadges(url, true, "Certificate is still valid", fmt.Sprintf("Expire Date: %s", expireDate), 0)
+		return true
+	}
+}
+
+func createCert(info Info, domain string, clientSet *kubernetes.Clientset) {
+	fmt.Println("Domain: ", domain)
+
+	getssl := exec.Command("./getssl", "-f", domain)
+	out, _ := getssl.CombinedOutput()
+
+	fmt.Println("Output: ", string(out))
+	var getsslOutput string = string(out)
+
+	pattern := `.*Verification\scompleted,\sobtaining\scertificate.*`
+	match, _ := regexp.MatchString(pattern, getsslOutput)
+
+	if match {
+		fmt.Println("Certificate created successfully\ncertificate upload to cert manager")
+
+		uploadCert(domain, cloud, info.SecretName, info.IngressName, info.Namespace, clientSet)
+	} else {
+		find := exec.Command("find", "/var/www/html/.well-known/acme-challenge/", "-maxdepth", "1", "-type", "f")
+		findOut, _ := find.CombinedOutput()
+		fmt.Println("Output: ", string(findOut))
+		var fullpath string = string(findOut)
+		fmt.Println("fullpath: ", fullpath)
+		basename := filepath.Base(fullpath)
+		content, err := os.ReadFile(strings.TrimSuffix(fullpath, "\n"))
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(domain, false, "acme-challenge file read error", err.Error(), 0)
+			os.Exit(1)
+		}
+
+		fmt.Println("content: ", string(content))
+
+		exec.Command("cp", "acme-challenge-base.yml", "acme-challenge.yml").Run()
+		exec.Command("cp", "file-name-base.yml", "file-name.yml").Run()
+		replaceStringInFile("acme-challenge.yml", "__FILE_NAME__", basename)
+		replaceStringInFile("acme-challenge.yml", "__CONTENT__", string(content))
+		replaceStringInFile("file-name.yml", "__FILE_NAME__", basename)
+
+		err = exec.Command("kubectl", "delete", "configmap", "acme-challenge", "-n", os.Getenv("POD_NAMESPACE")).Run()
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(domain, false, "acme-challenge configmap delete error", err.Error(), 0)
+			os.Exit(1)
+		}
+		err = exec.Command("kubectl", "delete", "configmap", "file-name", "-n", os.Getenv("POD_NAMESPACE")).Run()
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(domain, false, "file-name configmap delete error", err.Error(), 0)
+			os.Exit(1)
+		}
+		err = exec.Command("kubectl", "apply", "-f", "acme-challenge.yml", "-n", os.Getenv("POD_NAMESPACE")).Run()
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(domain, false, "acme-challenge configmap apply error", err.Error(), 0)
+			os.Exit(1)
+		}
+		err = exec.Command("kubectl", "apply", "-f", "file-name.yml", "-n", os.Getenv("POD_NAMESPACE")).Run()
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(domain, false, "file-name configmap apply error", err.Error(), 0)
+			os.Exit(1)
+		}
+		err = exec.Command("kubectl", "rollout", "restart", "deployment", "rhems-getssl-go", "-n", os.Getenv("POD_NAMESPACE")).Run()
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(domain, false, "rhems-getssl-go deployment restart error", err.Error(), 0)
+			os.Exit(1)
+		}
+
+		var url string = fmt.Sprintf("http://%s/.well-known/acme-challenge/%s", domain, basename)
+		waitAvailable(url, string(content))
+
+		getsslAgain := exec.Command("./getssl", "-f", domain)
+		getsslAgainOut, _ := getsslAgain.CombinedOutput()
+
+		fmt.Println("Output: ", string(getsslAgainOut))
+		var getsslAgainOutput string = string(getsslAgainOut)
+
+		patternAgain := `.*Certificate\ssaved\sin.*`
+		matchAgain, _ := regexp.MatchString(patternAgain, getsslAgainOutput)
+
+		if matchAgain {
+			fmt.Println("Certificate creation successful")
+			uploadCert(domain, cloud, info.SecretName, info.IngressName, info.Namespace, clientSet)
+		} else {
+			fmt.Println("Certificate creation failed")
+			postToBadges(domain, false, "Certificate creation failed", getsslAgainOutput, 0)
+			os.Exit(1)
+		}
 	}
 }
