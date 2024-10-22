@@ -1,13 +1,11 @@
 info:
-  - namespace: yutaro-test
-    secret_name: tencent-cert
-    domains:
-      - test-getssl.rhems-labs.org
-  - namespace: yutaro-test
-    secret_name: tencent-cert-2
-    domains:
-      - test-getssl-2.rhems-labs.org
-  - namespace: yutaro-test
-    secret_name: tencent-cert-3
-    domains:
-      - test-getssl-3.rhems-labs.org
+  - wildcard_domain: "*.example.com"
+    check_domains:
+      - "test-getssl.example.com"
+    ingresses:
+      - namespace: application-1
+        secret_name: application-cert-id
+      - namespace: application-2
+        secret_name: application-cert-id-2
+      - namespace: application-3
+        secret_name: application-cert-id-3

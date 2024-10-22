@@ -9,12 +9,9 @@ resources:
   - rbac.yml
 
 images:
-  - name: rhems-getssl-go
-    newName: registry.example/rhems-getssl
-    digest: sha256:aaaannnnccccsssskkkk
-  - name: rhems-getssl-job
-    newName: registry.example/rhems-getssl
-    digest: sha256:llllooooppppzzzzqqqq
+  - name: rhems-getssl
+    newName: rhemsjapan/rhems-getssl
+    newTag: latest
 
 configMapGenerator:
   - name: config

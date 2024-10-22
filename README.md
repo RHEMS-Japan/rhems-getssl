@@ -119,33 +119,33 @@ http-kubernetes/config.ymlにて取得したいドメインや書き換え対象
 ```yaml
 # tencentの場合
 info:
-  - namespace: yutaro-test # namespace名
+  - namespace: application-1 # namespace名
     secret_name: tencent-cert # qcloud_cert_idが格納されているsecret名
     domains:
-      - test-getssl.rhems-labs.org # 取得したいドメイン
-  - namespace: yutaro-test
+      - test-getssl.example.com # 取得したいドメイン
+  - namespace: application-1
     secret_name: tencent-cert-2
     domains:
-      - test-getssl-2.rhems-labs.org
-  - namespace: yutaro-test
+      - test-getssl-2.example.com
+  - namespace: application-1
     secret_name: tencent-cert-3
     domains:
-      - test-getssl-3.rhems-labs.org
+      - test-getssl-3.example.com
 ---
 # awsの場合
 info:
-  - namespace: yutaro-test # namespace名
+  - namespace: application-1 # namespace名
     ingress_name: test-getssl-ingress # ingress名
     domains:
-      - test-getssl.rhems-labs.org # 取得したいドメイン
-  - namespace: yutaro-test-2
+      - test-getssl.example.com # 取得したいドメイン
+  - namespace: application-1
     ingress_name: test-getssl-ingress-2
     domains:
-      - test-getssl-2.rhems-labs.org
-  - namespace: yutaro-test-3
+      - test-getssl-2.example.com
+  - namespace: application-1
     ingress_name: test-getssl-ingress-3
     domains:
-      - test-getssl-3.rhems-labs.org
+      - test-getssl-3.example.com
 ```
 
 http-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
@@ -191,7 +191,7 @@ roleRef:
 subjects:
   - name: getssl-job
     kind: ServiceAccount
-    namespace: yutaro-test # namespace名
+    namespace: application-1 # namespace名
 ```
 
 http-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。
@@ -200,7 +200,7 @@ http-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定し�
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: yutaro-test # namespace名
+namespace: application-1 # namespace名
 ```
 
 ### 2. デプロイ
@@ -241,7 +241,7 @@ spec:
 # tencentの場合
 spec:
   rules:
-    - host: test-getssl.rhems-labs.org
+    - host: test-getssl.example.com
       http:
         paths:
           - path: /.well-known/acme-challenge
@@ -272,11 +272,11 @@ rhems-getssl-go-dd7f89db-pczsw    1/1     Running     0          54m
 初回起動時は/.well-known/acme-challenge/dummyが外部アクセスより確認できるようになっております。
 証明書を取得したいドメイン+/.well-known/acme-challenge/dummyで正しく取得できるかどうか確認を行ってください。
 ```bash
-$ curl http://test-getssl.rhems-labs.org/.well-known/acme-challenge/dummy
+$ curl http://test-getssl.example.com/.well-known/acme-challenge/dummy
 dummy
-$ curl http://test-getssl-2.rhems-labs.org/.well-known/acme-challenge/dummy
+$ curl http://test-getssl-2.example.com/.well-known/acme-challenge/dummy
 dummy
-$ curl http://test-getssl-3.rhems-labs.org/.well-known/acme-challenge/dummy
+$ curl http://test-getssl-3.example.com/.well-known/acme-challenge/dummy
 dummy
 ```
 
@@ -406,28 +406,28 @@ dns-kubernetes/config.ymlにて取得したいドメインや書き換え対象�
 ```yaml
 # tencentの場合
 info:
-  - wildcard_domain: "*.test-getssl.rhems-labs.org"
+  - wildcard_domain: "*.test-getssl.example.com"
     check_domains:
-      - "cert.test-getssl.rhems-labs.org"
+      - "cert.test-getssl.example.com"
     secrets:
-      - namespace: yutaro-test
+      - namespace: application-1
         secret_name: rhems-getssl-cert
-      - namespace: yutaro-test
+      - namespace: application-2
         secret_name: rhems-getssl-cert-2
-      - namespace: yutaro-test
+      - namespace: application-3
         secret_name: rhems-getssl-cert-3
 ---
 # awsの場合
 info:
-  - wildcard_domain: "*.test-getssl.rhems-labs.org"
+  - wildcard_domain: "*.test-getssl.example.com"
     check_domains:
-      - "cert.test-getssl.rhems-labs.org"
+      - "cert.test-getssl.example.com"
     ingresses:
-      - namespace: yutaro-test
+      - namespace: application-1
         ingress_name: rhems-getssl-ingress
-      - namespace: yutaro-test
+      - namespace: application-2
         ingress_name: rhems-getssl-ingress-2
-      - namespace: yutaro-test
+      - namespace: application-3
         ingress_name: rhems-getssl-ingress-3
 ```
 
@@ -480,7 +480,7 @@ roleRef:
 subjects:
   - name: getssl-job
     kind: ServiceAccount
-    namespace: yutaro-test # namespace名
+    namespace: rhems-getssl # namespace名
 ```
 
 dns-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。

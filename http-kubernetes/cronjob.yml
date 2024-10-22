@@ -15,11 +15,9 @@ spec:
             app: rhems-getssl
         spec:
           serviceAccountName: getssl-job
-          nodeSelector:
-            karpenter.sh/provisioner-name: spondemand-amd64
           initContainers:
             - name: init-getssl
-              image: rhems-getssl-job
+              image: rhems-getssl
               imagePullPolicy: IfNotPresent
               workingDir: /tmp
               command:
@@ -68,7 +66,7 @@ spec:
                   subPath: config.yml
           containers:
             - name: rhems-getssl
-              image: rhems-getssl-job
+              image: rhems-getssl
               imagePullPolicy: IfNotPresent
               workingDir: /root
               command:
