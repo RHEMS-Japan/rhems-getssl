@@ -1,0 +1,13 @@
+info:
+  - namespace: yutaro-test
+    secret_name: tencent-cert
+    domains:
+      - test-getssl.rhems-labs.org
+  - namespace: yutaro-test
+    secret_name: tencent-cert-2
+    domains:
+      - test-getssl-2.rhems-labs.org
+  - namespace: yutaro-test
+    secret_name: tencent-cert-3
+    domains:
+      - test-getssl-3.rhems-labs.org

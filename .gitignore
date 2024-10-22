@@ -1,4 +1,5 @@
-/kubernetes/_env.yml
-/kubernetes/_cronjob.yml
-/kubernetes/_secret.yml
+/http-kubernetes/_env.yml
+/http-kubernetes/_cronjob.yml
+/http-kubernetes/_secret.yml
 /debug/
+/dockerfile/job/route53/.env

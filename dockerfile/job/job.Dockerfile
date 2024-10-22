@@ -1,9 +1,16 @@
 FROM golang:1.23.1-alpine3.19 as create-cert
 WORKDIR /tmp/create-cert
 COPY go.mod go.sum ./
-COPY main.go ./
+COPY create-cert.go ./
 RUN go mod download
-RUN go build -ldflags="-w -s" -o ./create-cert ./main.go
+RUN go build -ldflags="-w -s" -o ./create-cert ./create-cert.go
+
+FROM golang:1.23.1-alpine3.19 as dns_edit_route53
+WORKDIR /tmp/dns_edit_route53
+COPY route53/go.mod route53/go.sum ./
+COPY route53/dns_edit_route53.go ./
+RUN go mod download
+RUN go build -ldflags="-w -s" -o ./dns_edit_route53 ./dns_edit_route53.go
 
 FROM alpine:3.20.3
 
@@ -29,3 +36,16 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
 RUN mkdir -p /var/www/html/.well-known/acme-challenge && chmod 777 /var/www/html/.well-known/acme-challenge
 
 COPY --from=create-cert /tmp/create-cert/create-cert /tmp/create-cert
+
+COPY --from=dns_edit_route53 /tmp/dns_edit_route53/dns_edit_route53 /tmp/dns_edit_route53
+
+COPY ./init.sh /tmp/init.sh
+RUN chmod +x /tmp/init.sh
+
+COPY ./account-key-base.yml /tmp/configmap/account-key-base.yml
+COPY ./acme-challenge-base.yml /tmp/configmap/acme-challenge-base.yml
+COPY ./file-name-base.yml /tmp/configmap/file-name-base.yml
+COPY ./secret-base.yml /tmp/configmap/secret-base.yml
+RUN chmod 777 /tmp/configmap/account-key-base.yml
+RUN chmod 777 /tmp/configmap/acme-challenge-base.yml
+RUN chmod 777 /tmp/configmap/file-name-base.yml

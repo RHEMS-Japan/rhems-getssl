@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: rhems-getssl
+
+resources:
+  - cronjob.yml
+  - env.yml
+  - go.yml
+  - svc.yml
+  - ingress.yml
+  - rbac.yml
+  - acme-challenge.yml
+  - file-name.yml
+
+images:
+  - name: rhems-getssl-go
+    newName: registry.example/rhems-getssl
+    digest: sha256:aaaannnnccccsssskkkk
+  - name: rhems-getssl-job
+    newName: registry.example/rhems-getssl
+    digest: sha256:llllooooppppzzzzqqqq
+
+configMapGenerator:
+  - name: config
+    files:
+      - config.yml
