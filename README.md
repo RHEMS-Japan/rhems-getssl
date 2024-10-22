@@ -24,10 +24,7 @@ $ docker build -t rhems-getssl-job:latest -f job.Dockerfile ./
 イメージのPushが完了したらhttp-kubernetes/kustomization.ymlのimagesの部分を修正してください。
 ```yaml
 images:
-  - name: rhems-getssl-go
-    newName: レジストリURI/リポジトリ名
-    digest: sha256:aaabbbcccddd
-  - name: rhems-getssl-job
+  - name: rhems-getssl
     newName: レジストリURI/リポジトリ名
     digest: sha256:aaabbbcccddd
 ```
@@ -308,10 +305,7 @@ $ docker build -t rhems-getssl-job:latest -f job.Dockerfile ./
 イメージのPushが完了したらdns-kubernetes/kustomization.ymlのimagesの部分を修正してください。
 ```yaml
 images:
-  - name: rhems-getssl-go
-    newName: レジストリURI/リポジトリ名
-    digest: sha256:aaabbbcccddd
-  - name: rhems-getssl-job
+  - name: rhems-getssl
     newName: レジストリURI/リポジトリ名
     digest: sha256:aaabbbcccddd
 ```
