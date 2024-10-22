@@ -91,6 +91,12 @@ func main() {
 	flag.BoolVar(&dnsValidation, "dns-validation", false, "DNS validation. default '-dns-validation=false'")
 	flag.Parse()
 
+	if updateBeforeDay < 0 {
+		fmt.Println("Update before day must be greater than or equal to 0.")
+		postToBadges(os.Getenv("BRANCH"), false, "Update before day must be greater than or equal to 0.", "update before day error", 0)
+		os.Exit(1)
+	}
+
 	if yamlFile == "" {
 		fmt.Println("Please provide the path to the YAML file using -f flag.")
 		postToBadges(os.Getenv("BRANCH"), false, "Please provide the path to the YAML file using -f flag.", "config file not found", 0)
@@ -150,12 +156,11 @@ func main() {
 		}
 	}
 
-	if config.ServerDeploymentName == "" {
-		fmt.Println("Server Deployment Name is not provided. use default name 'rhems-getssl-go'.")
-		config.ServerDeploymentName = "rhems-getssl-go"
-	}
-
 	if !dnsValidation {
+		if config.ServerDeploymentName == "" {
+			fmt.Println("Server Deployment Name is not provided. use default name 'rhems-getssl-go'.")
+			config.ServerDeploymentName = "rhems-getssl-go"
+		}
 		editDeployment(0, clientSet, os.Getenv("POD_NAMESPACE"), config.ServerDeploymentName)
 	}
 	postToBadges(os.Getenv("BRANCH"), true, "All certificates are up to date", "All certificates are up to date", 0)
@@ -163,11 +168,11 @@ func main() {
 
 func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 	fmt.Println("Initialize")
-	if config.ServerDeploymentName == "" {
-		fmt.Println("Server Deployment Name is not provided. use default name 'rhems-getssl-go'.")
-		config.ServerDeploymentName = "rhems-getssl-go"
-	}
 	if !dnsValidation {
+		if config.ServerDeploymentName == "" {
+			fmt.Println("Server Deployment Name is not provided. use default name 'rhems-getssl-go'.")
+			config.ServerDeploymentName = "rhems-getssl-go"
+		}
 		editDeployment(1, clientSet, os.Getenv("POD_NAMESPACE"), config.ServerDeploymentName)
 	}
 	for _, info := range config.Info {
@@ -367,10 +372,10 @@ func editCertSecret(domain string, certificateId string, secretName string, name
 	replaceStringInFile("secret.yml", "__SECRET_NAME__", secretName)
 	replaceStringInFile("secret.yml", "__QCLOUD_CERT_ID__", b64.StdEncoding.EncodeToString([]byte(certificateId)))
 
-	err := exec.Command("kubectl", "apply", "-f", "secret.yml", "-n", namespace).Run()
+	output, err := exec.Command("kubectl", "apply", "-f", "secret.yml", "-n", namespace).CombinedOutput()
 	if err != nil {
-		fmt.Println(err.Error())
-		postToBadges(domain, false, "secret,yml apply error", err.Error(), 0)
+		fmt.Println(string(output))
+		postToBadges(domain, false, "secret.yml apply error", string(output), 0)
 		os.Exit(1)
 	}
 }

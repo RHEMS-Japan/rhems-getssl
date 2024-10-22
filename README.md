@@ -1,10 +1,13 @@
 # rhems-getssl
 
 Let's Encryptを使用して無料証明書を取得し各種証明書管理サービスへアップロードと証明書の更新を行いBadges経由でSlackに通知するスクリプトとシステムです。
+HTTP-01 チャレンジとDNS-01 チャレンジの両方に対応しています。
+また、DNS-01 チャレンジの場合は現在のところAWS Route53のみ対応しています。
 
 ## 構成
 
-acme-challengeのためのファイルを公開するGoサーバーPodと、証明書の取得を行うCronJobの2つで構成されています。
+HTTP-01 チャレンジを行う場合はacme-challengeのためのファイルを公開するGoサーバーPodと、証明書の取得を行うCronJobの2つで構成されています。
+DNS-01 チャレンジを行う場合は証明書の取得を行うCronJobのみで構成されています。
 
 ## 使用方法 HTTP-01 チャレンジの場合
 
@@ -18,7 +21,7 @@ $ cd dockerfile/job
 $ docker build -t rhems-getssl-job:latest -f job.Dockerfile ./ 
 ```
 
-イメージのPushが完了したらkubernetes/kustomization.ymlのimagesの部分を修正してください。
+イメージのPushが完了したらhttp-kubernetes/kustomization.ymlのimagesの部分を修正してください。
 ```yaml
 images:
   - name: rhems-getssl-go
@@ -29,7 +32,7 @@ images:
     digest: sha256:aaabbbcccddd
 ```
 
-kubernetesのcronjob.ymlにてクラウドサービスやrhems-badgeの各種変数を設定してください。
+http-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgeの各種変数を設定してください。
 ```yaml
 # 一部抜粋
 spec:
@@ -112,7 +115,7 @@ spec:
                   value: __SLACK_SUCCESS__ # slackの通知先
 ```
 
-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。
+http-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。
 ```yaml
 # tencentの場合
 info:
@@ -145,7 +148,7 @@ info:
       - test-getssl-3.rhems-labs.org
 ```
 
-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
+http-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -170,7 +173,7 @@ stringData:
   TENCENTCLOUD_REGION: __TENCENTCLOUD_REGION__
 ```
 
-kubernetes/rbac.ymlにて各種権限を設定してください。
+http-kubernetes/rbac.ymlにて各種権限を設定してください。
 ```yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -191,42 +194,20 @@ subjects:
     namespace: yutaro-test # namespace名
 ```
 
-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。
+http-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。
 ```yaml
 # 一部抜粋
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 namespace: yutaro-test # namespace名
-
-resources:
-  - cronjob.yml
-  - env.yml
-  - go.yml
-  - svc.yml
-  - ingress.yml
-  - rbac.yml
-
-images:
-  - name: rhems-getssl-go
-    newName: registry.example/rhems-getssl # レジストリURI/リポジトリ名
-    digest: sha256:aaaannnnccccsssskkkk # イメージのdigest
-  - name: rhems-getssl-job
-    newName: registry.example/rhems-getssl # レジストリURI/リポジトリ名
-    digest: sha256:llllooooppppzzzzqqqq # イメージのdigest
 ```
 
 ### 2. デプロイ
 
-kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。
+http-kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。
 ```bash
 $ kubectl kustomize .
-```
-
-GoサーバーPodの起動のため、先にfile-name.ymlとacme-challenge.ymlをapplyしてください。
-```bash
-$ kubectl apply -f file-name.yml
-$ kubectl apply -f acme-challenge.yml
 ```
 
 問題が無ければkubectl applyコマンドを実行してください。
@@ -249,6 +230,13 @@ spec:
                 name: rhems-getssl-svc
                 port:
                   number: 80
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: application-svc
+                port:
+                  number: 80
 ---
 # tencentの場合
 spec:
@@ -261,6 +249,13 @@ spec:
             backend:
               service:
                 name: rhems-getssl-svc
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: application-svc
                 port:
                   number: 80
 ```
@@ -310,7 +305,7 @@ $ cd dockerfile/job
 $ docker build -t rhems-getssl-job:latest -f job.Dockerfile ./ 
 ```
 
-イメージのPushが完了したらkubernetes/kustomization.ymlのimagesの部分を修正してください。
+イメージのPushが完了したらdns-kubernetes/kustomization.ymlのimagesの部分を修正してください。
 ```yaml
 images:
   - name: rhems-getssl-go
@@ -322,7 +317,7 @@ images:
 ```
 
 
-kubernetesのcronjob.ymlにてクラウドサービスやrhems-badgeの各種変数を設定してください。
+dns-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgeの各種変数を設定してください。
 ```yaml
 # 一部抜粋
 spec:
@@ -407,7 +402,7 @@ spec:
                   value: __SLACK_SUCCESS__ # slackの通知先
 ```
 
-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。
+dns-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。
 ```yaml
 # tencentの場合
 info:
@@ -436,7 +431,7 @@ info:
         ingress_name: rhems-getssl-ingress-3
 ```
 
-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
+dns-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
 Tencentの場合でもRoute53にドメインを登録するためにAWSのKey/Secが必要です。
 ```yaml
 # awsの場合
@@ -467,7 +462,7 @@ stringData:
   TENCENTCLOUD_REGION: __TENCENTCLOUD_REGION__
 ```
 
-kubernetes/rbac.ymlにて各種権限を設定してください。
+dns-kubernetes/rbac.ymlにて各種権限を設定してください。
 ```yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -488,78 +483,25 @@ subjects:
     namespace: yutaro-test # namespace名
 ```
 
-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。
+dns-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。
 ```yaml
 # 一部抜粋
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: yutaro-test # namespace名
-
-resources:
-  - cronjob.yml
-  - env.yml
-  - go.yml
-  - svc.yml
-  - ingress.yml
-  - rbac.yml
-
-images:
-  - name: rhems-getssl-go
-    newName: registry.example/rhems-getssl # レジストリURI/リポジトリ名
-    digest: sha256:aaaannnnccccsssskkkk # イメージのdigest
-  - name: rhems-getssl-job
-    newName: registry.example/rhems-getssl # レジストリURI/リポジトリ名
-    digest: sha256:llllooooppppzzzzqqqq # イメージのdigest
+namespace: rhems-getssl # namespace名
 ```
 
 ### 2. デプロイ
 
-kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。
+dns-kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。
 ```bash
 $ kubectl kustomize .
-```
-
-GoサーバーPodの起動のため、先にfile-name.ymlとacme-challenge.ymlをapplyしてください。
-```bash
-$ kubectl apply -f file-name.yml
-$ kubectl apply -f acme-challenge.yml
 ```
 
 問題が無ければkubectl applyコマンドを実行してください。
 ```bash
 $ kubectl apply -k .
-```
-
-取得したいドメインを受け持つIngressより/.well-known/acme-challenge/以下のリクエストをPodに転送するように設定してください。
-```yaml
-# awsの場合
-spec:
-  ingressClassName: alb
-  rules:
-    - http:
-        paths:
-          - path: /.well-known/acme-challenge/*
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: rhems-getssl-svc
-                port:
-                  number: 80
----
-# tencentの場合
-spec:
-  rules:
-    - host: test-getssl.rhems-labs.org
-      http:
-        paths:
-          - path: /.well-known/acme-challenge
-            pathType: Prefix
-            backend:
-              service:
-                name: rhems-getssl-svc
-                port:
-                  number: 80
 ```
 
 ### 3. 確認

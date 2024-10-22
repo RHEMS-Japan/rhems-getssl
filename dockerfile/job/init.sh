@@ -40,6 +40,3 @@ else
   echo "account.key is not empty"
   echo "${_configmap_account_key}" > /root/.getssl/account.key
 fi
-
-
-
