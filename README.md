@@ -11,23 +11,14 @@ DNS-01 チャレンジを行う場合は証明書の取得を行うCronJobのみ
 
 ## 使用方法 HTTP-01 チャレンジの場合
 
+HTTP-01 チャレンジ(HTTPアクセスによるトークン認証)を使用する場合は以下の手順に従ってください。
+なお、制約として下記にご注意ください。
+- 取得予定のドメインをhostコマンドで解決可能であること。
+- 80番ポートが外部からアクセス可能であること。 HTTPSリダイレクトも可。
+- 通常の証明書のみが取得可能。ワイルドカード証明書は取得不可。
+- GoサーバーとCronJobのPodが取得したいドメインでアクセス可能なIngressと同じNamespaceに存在していること。
+
 ### 1. 準備
-
-dockerfile/goやdockerfile/jobにてイメージbuildを行い各種レジストリサービスにPushしてください。
-```bash
-$ cd dockerfile/go
-$ docker build -t rhems-getssl-go:latest -f go.Dockerfile ./
-$ cd dockerfile/job
-$ docker build -t rhems-getssl-job:latest -f job.Dockerfile ./ 
-```
-
-イメージのPushが完了したらhttp-kubernetes/kustomization.ymlのimagesの部分を修正してください。
-```yaml
-images:
-  - name: rhems-getssl
-    newName: レジストリURI/リポジトリ名
-    digest: sha256:aaabbbcccddd
-```
 
 http-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgeの各種変数を設定してください。
 ```yaml
@@ -292,24 +283,12 @@ rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
 
 ## 使用方法 DNS-01 チャレンジの場合
 
+DNS-01 チャレンジ(DNSのTXTレコードによる認証)を使用する場合は以下の手順に従ってください。
+また、Wildcard証明書の取得が可能です。
+なお、制約として下記にご注意ください。
+- 今のところDNSサービスはAWS Route53のみ対応しています。
+
 ### 1. 準備
-
-dockerfile/goやdockerfile/jobにてイメージbuildを行い各種レジストリサービスにPushしてください。
-```bash
-$ cd dockerfile/go
-$ docker build -t rhems-getssl-go:latest -f go.Dockerfile ./
-$ cd dockerfile/job
-$ docker build -t rhems-getssl-job:latest -f job.Dockerfile ./ 
-```
-
-イメージのPushが完了したらdns-kubernetes/kustomization.ymlのimagesの部分を修正してください。
-```yaml
-images:
-  - name: rhems-getssl
-    newName: レジストリURI/リポジトリ名
-    digest: sha256:aaabbbcccddd
-```
-
 
 dns-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgeの各種変数を設定してください。
 ```yaml
@@ -509,7 +488,6 @@ $ kubectl create job --from=cronjob/rhems-getssl rhems-getssl-manual-123456
 job.batch/rhems-getssl-manual-123456 created
 $ kubectl get pod
 NAME                               READY   STATUS      RESTARTS   AGE
-rhems-getssl-go-6559dbf796-ssz4z   1/1     Running     0          5m50s
 rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
 ```
 
