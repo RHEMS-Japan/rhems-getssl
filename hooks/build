@@ -1,15 +1,13 @@
-#!/bin/bash
+
 
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
-_TAG=$(echo $IMAGE_NAME | cut -d ':' -f 2)
-
 echo "---- check env -----"
 echo $DOCKERFILE_PATH
-echo ${_TAG}
+echo $IMAGE_NAME
 
 docker buildx create --use --driver docker-container
-docker buildx build --platform linux/amd64,linux/arm64 -f ${DOCKERFILE_PATH} -t ${MUTLI_ARC_IMAGE_NAME} . --push
+docker buildx build --platform linux/amd64,linux/arm64 -f ${DOCKERFILE_PATH} -t ${IMAGE_NAME} . --push
 
 #docker build -f $DOCKERFILE_PATH -t $IMAGE_NAME .
 #
