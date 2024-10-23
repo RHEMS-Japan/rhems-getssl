@@ -6,5 +6,6 @@ echo "---- check env -----"
 echo $DOCKERFILE_PATH
 echo $IMAGE_NAME
 
+_TEST_IMAGE_NAME=$(echo $IMAGE_NAME | sed 's/:latest/:current/g')
 docker buildx create --use --driver docker-container
-docker buildx build --platform linux/amd64,linux/arm64 -f ${DOCKERFILE_PATH} -t ${IMAGE_NAME} . --push
+docker buildx build --platform linux/amd64,linux/arm64 --push -f "${DOCKERFILE_PATH}" -t "${_TEST_IMAGE_NAME}" .
