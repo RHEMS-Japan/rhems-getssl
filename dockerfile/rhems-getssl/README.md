@@ -4,12 +4,13 @@
 
 - `create-cert.go` : メインプログラム
 - `route53/dns_edit_route53.go`: getsslで使用するDNS認証のRoute53用のプログラム
+- `go-server/server.go`: ファイル認証用のサーバー
 - `init.sh`: 初期設定用のスクリプト
 - `account-key-base.yml`: getsslにて作成されるアカウントキーをconfigmapに保存するためのyamlファイル
 - `acme-challenge-base.yml`: getsslにて作成されるacme-challengeをconfigmapに保存するためのyamlファイル
 - `file-name-base.yml`: getsslにて作成されるacme-challengeファイル名をconfigmapに保存するためのyamlファイル
 - `secret-base.yml`: TKE向けの証明書IDをconfigmapに保存するためのyamlファイル
-- `job.Dockerfile`: rhems-getsslのCronjobで使用するためのDockerfile
+- `Dockerfile`: rhems-getsslのCronjob、ファイル認証用サーバーで使用するためのDockerfile
 
 ## create-certの実行オプション
 
