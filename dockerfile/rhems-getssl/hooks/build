@@ -7,4 +7,4 @@ echo $DOCKERFILE_PATH
 echo $IMAGE_NAME
 
 docker buildx create --use --driver docker-container
-docker buildx build --platform linux/amd64,linux/arm64 --push -f "${DOCKERFILE_PATH}" -t "${_IMAGE_NAME}" .
+docker buildx build --platform linux/amd64,linux/arm64 --push -f "${DOCKERFILE_PATH}" -t "${IMAGE_NAME}" .
