@@ -1,4 +1,4 @@
-
+#!/bin/bash
 
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
@@ -8,21 +8,3 @@ echo $IMAGE_NAME
 
 docker buildx create --use --driver docker-container
 docker buildx build --platform linux/amd64,linux/arm64 -f ${DOCKERFILE_PATH} -t ${IMAGE_NAME} . --push
-
-#docker build -f $DOCKERFILE_PATH -t $IMAGE_NAME .
-#
-#if [ ${_TAG} == "main" ]
-#then
-#    MUTLI_ARC_IMAGE_NAME=$(echo $IMAGE_NAME | sed 's/:main/:latest/g')
-#    docker buildx create --use --driver docker-container
-#    docker buildx build --platform linux/amd64,linux/arm64 -f ${DOCKERFILE_PATH} -t ${MUTLI_ARC_IMAGE_NAME} . --push
-#fi
-
-
-# echo "----- add tag -----"
-# docker tag ${PRE_IMAGE_NAME} ${IMAGE_NAME}
-
-# echo "====== inspect ======"
-# docker buildx imagetools inspect $IMAGE_NAME
-# docker buildx create --use
-# docker build build --platform linux/arm64 -f $DOCKERFILE_PATH -t $IMAGE_NAME .
