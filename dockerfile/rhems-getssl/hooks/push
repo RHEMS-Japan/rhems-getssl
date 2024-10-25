@@ -1,0 +1,11 @@
+#!/bin/bash
+
+export DOCKER_CLI_EXPERIMENTAL=enabled
+
+echo "---- check env -----"
+echo $DOCKERFILE_PATH
+echo $IMAGE_NAME
+
+echo "NOTHING TO DO"
+
+echo "---- DONE -----"
