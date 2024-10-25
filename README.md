@@ -1,5 +1,7 @@
 # rhems-getssl
 
+![docker-hub](https://img.shields.io/docker/automated/rhemsjapan/rhems-getssl)
+
 Let's Encryptを使用して無料証明書を取得し各種証明書管理サービスへアップロードと証明書の更新を行いBadges経由でSlackに通知するスクリプトとシステムです。
 HTTP-01 チャレンジとDNS-01 チャレンジの両方に対応しています。
 また、DNS-01 チャレンジの場合は現在のところAWS Route53のみ対応しています。
