@@ -31,17 +31,17 @@ import (
 	"time"
 )
 
-type Secret struct {
+type Secret struct { // TKE用Secret 設定
 	Namespace  string `yaml:"namespace"`
 	SecretName string `yaml:"secret_name"`
 }
 
-type Ingress struct {
+type Ingress struct { // EKS用Ingress 設定
 	Namespace   string `yaml:"namespace"`
 	IngressName string `yaml:"ingress_name"`
 }
 
-type Info struct {
+type Info struct { // 証明書情報
 	Namespace      string    `yaml:"namespace"`
 	IngressName    string    `yaml:"ingress_name"`
 	SecretName     string    `yaml:"secret_name"`
@@ -52,12 +52,12 @@ type Info struct {
 	Secrets        []Secret  `yaml:"secrets"`
 }
 
-type Config struct {
+type Config struct { // yamlファイルの構造
 	Info                 []Info `yaml:"info"`
 	ServerDeploymentName string `yaml:"server_deployment_name"`
 }
 
-type Badges struct {
+type Badges struct { // RHEMS Badges API 用
 	ApiToken     string `json:"api_token"`
 	Organization string `json:"organization"`
 	Repo         string `json:"repo"`
@@ -73,15 +73,16 @@ type Badges struct {
 	Log          string `json:"log"`
 }
 
-var yamlFile string
-var cloud string
-var initialize bool
-var force bool
-var updateBeforeDay int
-var letsEncryptEnvironment string
-var dnsValidation bool
+var yamlFile string               // -f flag
+var cloud string                  // -c flag
+var initialize bool               // -i flag
+var force bool                    // -force flag
+var updateBeforeDay int           // -update-before-day flag
+var letsEncryptEnvironment string // -lets-encrypt-environment flag
+var dnsValidation bool            // -dns-validation flag
 
 func main() {
+	// 実行フラグ取得
 	flag.StringVar(&yamlFile, "f", "config.yml", "Path to the YAML file containing info. default '-f config.yml'")
 	flag.StringVar(&cloud, "c", "aws", "Select cloud provider aws or tencent. default '-c aws'")
 	flag.BoolVar(&initialize, "i", false, "Initialize create-cert")
@@ -91,18 +92,21 @@ func main() {
 	flag.BoolVar(&dnsValidation, "dns-validation", false, "DNS validation. default '-dns-validation=false'")
 	flag.Parse()
 
+	// -update-before-day flagの値チェック
 	if updateBeforeDay < 0 {
 		fmt.Println("Update before day must be greater than or equal to 0.")
 		postToBadges(os.Getenv("BRANCH"), false, "Update before day must be greater than or equal to 0.", "update before day error", 0)
 		os.Exit(1)
 	}
 
+	// -f flagの値チェック
 	if yamlFile == "" {
 		fmt.Println("Please provide the path to the YAML file using -f flag.")
 		postToBadges(os.Getenv("BRANCH"), false, "Please provide the path to the YAML file using -f flag.", "config file not found", 0)
 		os.Exit(1)
 	}
 
+	// config Fileの読み込み
 	yamlData, err := os.ReadFile(yamlFile)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -110,6 +114,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// yamlファイルの構造体に変換
 	var config Config
 	if err := yaml.Unmarshal(yamlData, &config); err != nil {
 		fmt.Println(err.Error())
@@ -117,12 +122,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Kubernetes Clientの初期化
 	clientSet := initKubeClient()
 
+	// 初期化処理
 	if initialize {
 		initGetssl(config, clientSet)
 	}
 
+	// 証明書更新処理
 	for _, info := range config.Info {
 		fmt.Println("Namespace: ", info.Namespace)
 		fmt.Println("Ingress Name: ", info.IngressName)
@@ -156,6 +164,7 @@ func main() {
 		}
 	}
 
+	// DNS validationが無効の場合、Goサーバーのレプリカ数を0に戻す
 	if !dnsValidation {
 		if config.ServerDeploymentName == "" {
 			fmt.Println("Server Deployment Name is not provided. use default name 'rhems-getssl-go'.")
@@ -163,11 +172,16 @@ func main() {
 		}
 		editDeployment(0, clientSet, os.Getenv("POD_NAMESPACE"), config.ServerDeploymentName)
 	}
+
+	// 全ての証明書が更新された場合、Badgesに通知
 	postToBadges(os.Getenv("BRANCH"), true, "All certificates are up to date", "All certificates are up to date", 0)
 }
 
+// 初期化処理
 func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 	fmt.Println("Initialize")
+
+	// DNS validationが無効の場合、Goサーバーのレプリカ数を1に変更
 	if !dnsValidation {
 		if config.ServerDeploymentName == "" {
 			fmt.Println("Server Deployment Name is not provided. use default name 'rhems-getssl-go'.")
@@ -175,6 +189,8 @@ func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 		}
 		editDeployment(1, clientSet, os.Getenv("POD_NAMESPACE"), config.ServerDeploymentName)
 	}
+
+	// getsslの初期化処理
 	for _, info := range config.Info {
 		fmt.Println("Namespace: ", info.Namespace)
 		fmt.Println("Ingress Name: ", info.IngressName)
@@ -204,6 +220,7 @@ func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 		}
 	}
 
+	// DNS validationが有効の場合、Route53変更のためのスクリプトを設定
 	if dnsValidation {
 		if letsEncryptEnvironment == "production" {
 			replaceStringInFile("/root/.getssl/getssl.cfg", "CA=\"https://acme-staging-v02.api.letsencrypt.org\"", "CA=\"https://acme-v02.api.letsencrypt.org\"")
@@ -217,6 +234,7 @@ func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 	os.Exit(0)
 }
 
+// Kubernetes Clientの初期化
 func initKubeClient() *kubernetes.Clientset {
 	var kubeconfig *string
 	var config *rest.Config
@@ -252,12 +270,15 @@ func initKubeClient() *kubernetes.Clientset {
 	return clientSet
 }
 
+// 証明書アップロード処理
 func uploadCert(domain string, cloud string) string {
+	// getsslで作成された証明書ファイルのパス
 	certPath := fmt.Sprintf("/root/.getssl/%s/%s.crt", domain, domain)
 	fullCertChainPath := fmt.Sprintf("/root/.getssl/%s/%s_chain.pem", domain, domain)
 	privateKeyPath := fmt.Sprintf("/root/.getssl/%s/%s.key", domain, domain)
 	certChainPath := fmt.Sprintf("/root/.getssl/%s/chain.crt", domain)
 
+	// 証明書ファイルの読み込み
 	cert, err := os.ReadFile(certPath)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -282,6 +303,8 @@ func uploadCert(domain string, cloud string) string {
 		postToBadges(domain, false, "full chain file read error", err.Error(), 0)
 		os.Exit(1)
 	}
+
+	// AWS or Tencent Cloud に証明書をアップロード
 	if cloud == "aws" {
 		arn := uploadCertAWS(domain, cert, privateKey, certChain)
 
@@ -289,10 +312,6 @@ func uploadCert(domain string, cloud string) string {
 		fmt.Println("Certificate ARN: ", *arn)
 
 		return *arn
-
-		//editIngress(domain, clientSet, namespace, ingressName, *arn)
-		//
-		//postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+*arn, 0)
 	} else {
 		response := uploadCertTencent(domain, fullCertChain, privateKey)
 
@@ -300,13 +319,10 @@ func uploadCert(domain string, cloud string) string {
 		fmt.Println("Certificate response: ", response.ToJsonString())
 
 		return *response.Response.CertificateId
-
-		//editCertSecret(domain, *response.Response.CertificateId, secretName, namespace, clientSet)
-		//
-		//postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+*response.Response.CertificateId, 0)
 	}
 }
 
+// AWSに証明書をアップロード
 func uploadCertAWS(domain string, certificate []byte, privateKey []byte, certificateChain []byte) *string {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
@@ -333,39 +349,31 @@ func uploadCertAWS(domain string, certificate []byte, privateKey []byte, certifi
 	return output.CertificateArn
 }
 
+// Tencent Cloudに証明書をアップロード
 func uploadCertTencent(domain string, certificate []byte, privateKey []byte) *ssl.UploadCertificateResponse {
-	// Required steps:
-	// Instantiate an authentication object. The Tencent Cloud account key pair `secretId` and `secretKey` need to be passed in as the input parameters
-	// This example uses the way to read from the environment variable, so you need to set these two values in the environment variable in advance
-	// You can also write the key pair directly into the code, but be careful not to copy, upload, or share the code to others
-	// Query the CAM key: https://console.tencentcloud.com/capi
 	credential := common.NewCredential(os.Getenv("TENCENTCLOUD_SECRET_ID"), os.Getenv("TENCENTCLOUD_SECRET_KEY"))
-	// Optional steps:
-	// Instantiate a client configuration object. You can specify the timeout period and other configuration items
+
 	cpf := profile.NewClientProfile()
 	cpf.HttpProfile.Endpoint = "ssl.tencentcloudapi.com"
-	// Instantiate an client object
-	// The second parameter is the region information. You can directly enter the string "ap-guangzhou" or import the preset constant
+
 	client, _ := ssl.NewClient(credential, os.Getenv("TENCENTCLOUD_REGION"), cpf)
 
-	// Instantiate a request object. You can further set the request parameters according to the API called and actual conditions
 	request := ssl.NewUploadCertificateRequest()
 
 	request.CertificatePublicKey = common.StringPtr(string(certificate))
 	request.CertificatePrivateKey = common.StringPtr(string(privateKey))
 
-	// The returned "resp" is an instance of the UploadCertificateResponse class which corresponds to the request object
 	response, err := client.UploadCertificate(request)
 	if _, ok := err.(*errors.TencentCloudSDKError); ok {
 		fmt.Printf("An API error has returned: %s", err)
 		postToBadges(domain, false, "tencent api error", fmt.Sprintf("An API error has returned: %s", err), 0)
 		os.Exit(1)
 	}
-	// A string return packet in JSON format is output
 
 	return response
 }
 
+// TKE用証明書IDSecretの作成、更新
 func editCertSecret(domain string, certificateId string, secretName string, namespace string) {
 	exec.Command("rm", "secret.yml").Run()
 	exec.Command("cp", "secret-base.yml", "secret.yml").Run()
@@ -380,6 +388,7 @@ func editCertSecret(domain string, certificateId string, secretName string, name
 	}
 }
 
+// EKS用証明書ARNのIngressへの適用
 func editIngress(domain string, clientSet *kubernetes.Clientset, namespace string, ingressName string, arn string) {
 	ingressInterface := clientSet.NetworkingV1().Ingresses(namespace)
 
@@ -398,6 +407,7 @@ func editIngress(domain string, clientSet *kubernetes.Clientset, namespace strin
 	}
 }
 
+// Deploymentのレプリカ数変更
 func editDeployment(replicas int, clientSet *kubernetes.Clientset, namespace string, deploymentName string) {
 	deploymentInterface := clientSet.AppsV1().Deployments(namespace)
 
@@ -416,6 +426,7 @@ func editDeployment(replicas int, clientSet *kubernetes.Clientset, namespace str
 	}
 }
 
+// ファイルの置換
 func replaceStringInFile(filename string, old string, new string) {
 	input, err := os.ReadFile(filename)
 	if err != nil {
@@ -436,6 +447,7 @@ func replaceStringInFile(filename string, old string, new string) {
 	}
 }
 
+// ファイル認証の待機
 func waitAvailable(url string, content string) {
 	// Wait for the file to be available
 	var resp *http.Response
@@ -469,6 +481,7 @@ func waitAvailable(url string, content string) {
 	}
 }
 
+// Badges API への通知
 func postToBadges(app string, status bool, msg string, log string, count int) {
 	graceTime, err := strconv.Atoi(os.Getenv("GRACE_TIME"))
 	if err != nil {
@@ -514,6 +527,7 @@ func postToBadges(app string, status bool, msg string, log string, count int) {
 	}
 }
 
+// 証明書の有効期限チェック
 func checkCertValidation(url string) bool {
 	res, err := http.Get("https://" + url)
 
@@ -546,6 +560,7 @@ func checkCertValidation(url string) bool {
 	}
 }
 
+// 証明書の作成と適用
 func createCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 	fmt.Println("Domain: ", domain)
 
@@ -640,6 +655,7 @@ func createCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 	}
 }
 
+// DNS認証によるwildcard証明書の作成と適用
 func createWildCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 	fmt.Println("Domain: ", domain)
 
@@ -668,6 +684,7 @@ func createWildCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 	}
 }
 
+// 証明書の適用
 func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clientset, namespace string, ingressName string, secretName string) {
 	if cloud == "aws" {
 		fmt.Println("Certificate ARN: ", certId)
