@@ -22,7 +22,6 @@ RUN go build -ldflags="-w -s" -o ./server ./server.go
 FROM alpine:3.20.3
 
 # Install necessary packages
-#RUN apk add --no-cache bind-tools jq unzip sudo curl bash openssl aws-cli git py3-pip pwgen
 RUN apk add --no-cache bind-tools jq unzip sudo curl bash openssl git
 
 # Install getssl
@@ -34,10 +33,6 @@ WORKDIR /tmp/kubectl
 RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
       && mv kubectl /usr/local/bin/kubectl \
       && chmod +x /usr/local/bin/kubectl
-
-## Install tccli
-#WORKDIR /tmp/tccli
-#RUN sudo pip3 install --break-system-packages tccli-intl-en
 
 # Create a directory for the acme-challenge
 RUN mkdir -p /var/www/html/.well-known/acme-challenge && chmod 777 /var/www/html/.well-known/acme-challenge
@@ -55,6 +50,3 @@ COPY ./account-key-base.yml /tmp/configmap/account-key-base.yml
 COPY ./acme-challenge-base.yml /tmp/configmap/acme-challenge-base.yml
 COPY ./file-name-base.yml /tmp/configmap/file-name-base.yml
 COPY ./secret-base.yml /tmp/configmap/secret-base.yml
-RUN chmod 777 /tmp/configmap/account-key-base.yml
-RUN chmod 777 /tmp/configmap/acme-challenge-base.yml
-RUN chmod 777 /tmp/configmap/file-name-base.yml
