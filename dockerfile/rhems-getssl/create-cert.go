@@ -220,12 +220,14 @@ func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 			fmt.Println("Output: \n", string(output))
 
 			if info.WildCardSans != nil {
-				var sans string
+				sans := ""
 				for _, domain := range info.WildCardSans {
-					sans += sans + domain + ","
+					fmt.Println("Sans: ", domain)
+					sans = sans + domain + ","
 				}
 				sans = strings.TrimSuffix(sans, ",")
-				replaceStringInFile("/root/.getssl/"+info.WildcardDomain+"/getssl.cfg", "#SANS=", "SANS=\""+sans+"\"")
+				wwwDomain := "www." + strings.TrimPrefix(info.WildcardDomain, "*.")
+				replaceStringInFile("/root/.getssl/"+info.WildcardDomain+"/getssl.cfg", "#SANS=\""+wwwDomain+"\"", "SANS=\""+sans+"\"")
 			}
 		}
 	}
