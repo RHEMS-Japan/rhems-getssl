@@ -138,21 +138,27 @@ func main() {
 
 		if info.WildcardDomain != "" {
 			if !force {
+				var isNotExpire bool
+				var expireDate string
 				for _, checkDomain := range info.CheckDomains {
-					if checkCertValidation(checkDomain) {
+					isNotExpire, expireDate = checkCertValidation(checkDomain)
+					if isNotExpire {
 						continue
 					} else {
 						createWildCert(info, info.WildcardDomain, clientSet)
 						break
 					}
 				}
+				postToBadges(info.WildcardDomain, true, "Certificate is still valid", fmt.Sprintf("Expire Date: %s", expireDate), 0)
 			} else {
 				createWildCert(info, info.WildcardDomain, clientSet)
 			}
 		} else {
 			for _, domain := range info.Domains {
 				if !force {
-					if checkCertValidation(domain) {
+					isNotExpire, expireDate := checkCertValidation(domain)
+					if isNotExpire {
+						postToBadges(domain, true, "Certificate is still valid", fmt.Sprintf("Expire Date: %s", expireDate), 0)
 						continue
 					} else {
 						createCert(info, domain, clientSet)
@@ -528,7 +534,7 @@ func postToBadges(app string, status bool, msg string, log string, count int) {
 }
 
 // 証明書の有効期限チェック
-func checkCertValidation(url string) bool {
+func checkCertValidation(url string) (bool, string) {
 	res, err := http.Get("https://" + url)
 
 	if err != nil {
@@ -552,11 +558,10 @@ func checkCertValidation(url string) bool {
 
 	if time.Now().After(expireTime.Add(-24 * time.Duration(updateBeforeDay) * time.Hour)) {
 		fmt.Println("Certificate needs to be updated")
-		return false
+		return false, ""
 	} else {
 		fmt.Println("Certificate is still valid")
-		postToBadges(url, true, "Certificate is still valid", fmt.Sprintf("Expire Date: %s", expireDate), 0)
-		return true
+		return true, expireJSTDate
 	}
 }
 
