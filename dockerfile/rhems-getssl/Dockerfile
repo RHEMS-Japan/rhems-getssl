@@ -1,18 +1,18 @@
-FROM golang:1.23.2-alpine3.20 as create-cert
+FROM golang:1.23.2-alpine3.20 AS create-cert
 WORKDIR /tmp/create-cert
 COPY go.mod go.sum ./
 COPY create-cert.go ./
 RUN go mod download
 RUN go build -ldflags="-w -s" -o ./create-cert ./create-cert.go
 
-FROM golang:1.23.2-alpine3.20 as dns_edit_route53
+FROM golang:1.23.2-alpine3.20 AS dns_edit_route53
 WORKDIR /tmp/dns_edit_route53
 COPY route53/go.mod route53/go.sum ./
 COPY route53/dns_edit_route53.go ./
 RUN go mod download
 RUN go build -ldflags="-w -s" -o ./dns_edit_route53 ./dns_edit_route53.go
 
-FROM golang:1.23.2-alpine3.20 as go-server
+FROM golang:1.23.2-alpine3.20 AS go-server
 WORKDIR /tmp/go-server
 COPY go-server/go.mod ./
 COPY go-server/server.go ./
