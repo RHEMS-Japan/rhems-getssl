@@ -47,6 +47,7 @@ type Info struct { // 証明書情報
 	SecretName     string    `yaml:"secret_name"`
 	Domains        []string  `yaml:"domains"`
 	WildcardDomain string    `yaml:"wildcard_domain"`
+	WildCardSans   []string  `yaml:"wildcard_sans"`
 	CheckDomains   []string  `yaml:"check_domains"`
 	Ingresses      []Ingress `yaml:"ingresses"`
 	Secrets        []Secret  `yaml:"secrets"`
@@ -217,6 +218,15 @@ func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 				os.Exit(1)
 			}
 			fmt.Println("Output: \n", string(output))
+
+			if info.WildCardSans != nil {
+				var sans string
+				for _, domain := range info.WildCardSans {
+					sans += sans + domain + ","
+				}
+				sans = strings.TrimSuffix(sans, ",")
+				replaceStringInFile("/root/.getssl/"+info.WildcardDomain+"/getssl.cfg", "#SANS=", "SANS=\""+sans+"\"")
+			}
 		}
 	}
 

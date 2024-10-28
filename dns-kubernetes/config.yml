@@ -1,5 +1,7 @@
 info:
   - wildcard_domain: "*.example.com"
+    wildcard_sans:
+      - "*.test.example.com"
     check_domains:
       - "test-getssl.example.com"
     ingresses:
