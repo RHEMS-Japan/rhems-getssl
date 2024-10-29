@@ -382,6 +382,10 @@ dns-kubernetes/config.ymlにて取得したいドメインや書き換え対象�
 # tencentの場合
 info:
   - wildcard_domain: "*.test-getssl.example.com"
+    wildcard_sans:
+      - "*.mail.test-getssl.example.com"
+      - "*.api.test-getssl.example.com"
+      - "*.admin.test-getssl.example.com"
     check_domains:
       - "cert.test-getssl.example.com"
     secrets:
@@ -395,6 +399,10 @@ info:
 # awsの場合
 info:
   - wildcard_domain: "*.test-getssl.example.com"
+    wildcard_sans:
+      - "*.mail.test-getssl.example.com"
+      - "*.api.test-getssl.example.com"
+      - "*.admin.test-getssl.example.com"
     check_domains:
       - "cert.test-getssl.example.com"
     ingresses:
