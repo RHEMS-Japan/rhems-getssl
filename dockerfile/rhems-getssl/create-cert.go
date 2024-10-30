@@ -725,39 +725,3 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 		postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
 	}
 }
-
-func checkSecret(clientSet *kubernetes.Clientset, secrets []Secret) {
-	var checkSecrets []CheckSecret
-	for _, info := range secrets {
-		secretInterface := clientSet.CoreV1().Secrets(info.Namespace)
-		result, err := secretInterface.Get(context.TODO(), info.SecretName, metav1.GetOptions{})
-		if err != nil {
-			checkSecrets = append(checkSecrets, CheckSecret{info.Namespace, info.SecretName, ""})
-			continue
-		}
-		certId, err := b64.StdEncoding.DecodeString(string(result.Data["qcloud_cert_id"]))
-		if err != nil {
-			checkSecrets = append(checkSecrets, CheckSecret{info.Namespace, info.SecretName, ""})
-			continue
-		}
-		checkSecrets = append(checkSecrets, CheckSecret{info.Namespace, info.SecretName, string(certId)})
-	}
-}
-
-func checkIngress(clientSet *kubernetes.Clientset, ingresses []Ingress) {
-	var checkIngresses []CheckIngress
-	for _, info := range ingresses {
-		ingressInterface := clientSet.NetworkingV1().Ingresses(info.Namespace)
-		result, err := ingressInterface.Get(context.TODO(), info.IngressName, metav1.GetOptions{})
-		if err != nil {
-			checkIngresses = append(checkIngresses, CheckIngress{info.Namespace, info.IngressName, ""})
-			continue
-		}
-		certArn, ok := result.Annotations["alb.ingress.kubernetes.io/certificate-arn"]
-		if !ok {
-			checkIngresses = append(checkIngresses, CheckIngress{info.Namespace, info.IngressName, ""})
-			continue
-		}
-		checkIngresses = append(checkIngresses, CheckIngress{info.Namespace, info.IngressName, certArn})
-	}
-}
