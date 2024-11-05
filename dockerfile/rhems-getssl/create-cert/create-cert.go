@@ -167,9 +167,9 @@ func main() {
 				createWildCert(info, info.WildcardDomain, clientSet)
 			}
 			if cloud == "aws" {
-				checkIngress(clientSet, info.Ingresses)
+				checkIngress(clientSet, info.Ingresses, info.WildcardDomain)
 			} else {
-				checkSecret(clientSet, info.Secrets)
+				checkSecret(clientSet, info.Secrets, info.WildcardDomain)
 			}
 		} else {
 			for _, domain := range info.Domains {
@@ -585,12 +585,20 @@ func checkCertValidation(url string) (bool, string) {
 	fmt.Println("Update Before Day: ", updateBeforeDay)
 	fmt.Println("しきい値: ", expireTime.Add(-24*time.Duration(updateBeforeDay)*time.Hour))
 
-	if time.Now().After(expireTime.Add(-24 * time.Duration(updateBeforeDay) * time.Hour)) {
-		fmt.Println("Certificate needs to be updated")
-		return false, ""
-	} else {
+	if isCertTimeValid(expireTime) {
 		fmt.Println("Certificate is still valid")
 		return true, expireJSTDate
+	} else {
+		fmt.Println("Certificate needs to be updated")
+		return false, ""
+	}
+}
+
+func isCertTimeValid(certNotAfter time.Time) bool {
+	if time.Now().After(certNotAfter.Add(-24 * time.Duration(updateBeforeDay) * time.Hour)) {
+		return false
+	} else {
+		return true
 	}
 }
 
@@ -731,8 +739,9 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 	}
 }
 
-func checkSecret(clientSet *kubernetes.Clientset, secrets []Secret) {
+func checkSecret(clientSet *kubernetes.Clientset, secrets []Secret, domain string) {
 	var checkSecrets []CheckSecret
+	certIdCount := make(map[string]int)
 	for _, info := range secrets {
 		secretInterface := clientSet.CoreV1().Secrets(info.Namespace)
 		result, err := secretInterface.Get(context.TODO(), info.SecretName, metav1.GetOptions{})
@@ -741,31 +750,46 @@ func checkSecret(clientSet *kubernetes.Clientset, secrets []Secret) {
 			continue
 		}
 		checkSecrets = append(checkSecrets, CheckSecret{info.Namespace, info.SecretName, string(result.Data["qcloud_cert_id"])})
+		certIdCount[string(result.Data["qcloud_cert_id"])] += 1
 	}
 
-	for _, secret := range checkSecrets {
-		fmt.Println("Namespace: ", secret.Namespace)
-		fmt.Println("Secret Name: ", secret.SecretName)
-		fmt.Println("Certificate ID: ", secret.CertificateID)
-
-		response, err := getCertTencent(secret.CertificateID)
-		if err != nil {
-			fmt.Println(err.Error())
-			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
-			os.Exit(1)
+	var mostUsedCertId string
+	var mostUsedCertCount int
+	for certId, count := range certIdCount {
+		if count > mostUsedCertCount {
+			mostUsedCertId = certId
 		}
+	}
 
-		err = readCert(response.Response.Content)
-		if err != nil {
-			fmt.Println(err.Error())
-			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
-			os.Exit(1)
+	response, err := getCertTencent(mostUsedCertId)
+	if err != nil {
+		fmt.Println(err.Error())
+		postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+		os.Exit(1)
+	}
+
+	notAfter, err := readCert(response.Response.Content)
+	if err != nil {
+		fmt.Println(err.Error())
+		postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+		os.Exit(1)
+	}
+
+	if isCertTimeValid(notAfter) {
+		fmt.Println("Most used certificate is still valid")
+		for _, secret := range checkSecrets {
+			if secret.CertificateID != mostUsedCertId {
+				editCertSecret(domain, mostUsedCertId, secret.SecretName, secret.Namespace)
+			}
 		}
+	} else {
+		fmt.Println("Most used certificate needs to be updated")
 	}
 }
 
-func checkIngress(clientSet *kubernetes.Clientset, ingresses []Ingress) {
+func checkIngress(clientSet *kubernetes.Clientset, ingresses []Ingress, domain string) {
 	var checkIngresses []CheckIngress
+	certARNCount := make(map[string]int)
 	for _, info := range ingresses {
 		ingressInterface := clientSet.NetworkingV1().Ingresses(info.Namespace)
 		result, err := ingressInterface.Get(context.TODO(), info.IngressName, metav1.GetOptions{})
@@ -779,25 +803,39 @@ func checkIngress(clientSet *kubernetes.Clientset, ingresses []Ingress) {
 			continue
 		}
 		checkIngresses = append(checkIngresses, CheckIngress{info.Namespace, info.IngressName, certArn})
+		certARNCount[certArn] += 1
 	}
 
-	for _, ingress := range checkIngresses {
-		fmt.Println("Namespace: ", ingress.Namespace)
-		fmt.Println("Ingress Name: ", ingress.IngressName)
-		fmt.Println("Certificate ARN: ", ingress.CertificateARN)
-
-		cert, err := getCertAWS(ingress.CertificateARN)
-		if err != nil {
-			fmt.Println(err.Error())
-			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
-			os.Exit(1)
+	var mostUsedCertARN string
+	var mostUsedCertCount int
+	for certARN, count := range certARNCount {
+		if count > mostUsedCertCount {
+			mostUsedCertARN = certARN
 		}
+	}
 
-		err = readCert(*cert.Certificate)
-		if err != nil {
-			fmt.Println(err.Error())
-			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
-			os.Exit(1)
+	cert, err := getCertAWS(mostUsedCertARN)
+	if err != nil {
+		fmt.Println(err.Error())
+		postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+		os.Exit(1)
+	}
+
+	notAfter, err := readCert(*cert.Certificate)
+	if err != nil {
+		fmt.Println(err.Error())
+		postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+		os.Exit(1)
+	}
+
+	if isCertTimeValid(notAfter) {
+		fmt.Println("Most used certificate is still valid")
+		for _, ingress := range checkIngresses {
+			if ingress.CertificateARN != mostUsedCertARN {
+				editIngress(domain, clientSet, ingress.Namespace, ingress.IngressName, mostUsedCertARN)
+			}
 		}
+	} else {
+		fmt.Println("Most used certificate needs to be updated")
 	}
 }

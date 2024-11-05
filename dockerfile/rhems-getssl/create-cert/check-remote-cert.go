@@ -17,6 +17,7 @@ import (
 	ssl "github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/ssl/v20191205"
 	"os"
 	"regexp"
+	"time"
 )
 
 type TencentCertResponse struct {
@@ -135,29 +136,29 @@ func getCertAWS(arn string) (*acm.GetCertificateOutput, error) {
 	return output, nil
 }
 
-func readCert(cert string) error {
+func readCert(cert string) (time.Time, error) {
 	if cert == "" {
 		fmt.Println("No certificate found")
-		return fmt.Errorf("no certificate found")
+		return time.Time{}, fmt.Errorf("no certificate found")
 	}
 
 	block, _ := pem.Decode([]byte(cert))
 	if block == nil {
 		fmt.Println("Failed to parse certificate")
-		return fmt.Errorf("failed to parse certificate")
+		return time.Time{}, fmt.Errorf("failed to parse certificate")
 	}
 
 	parsedCert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
 		fmt.Println("Failed to parse certificate")
 		fmt.Println(err)
-		return err
+		return time.Time{}, err
 	}
 
 	fmt.Println("Not After: " + parsedCert.NotAfter.String())
 	fmt.Println("Not Before: " + parsedCert.NotBefore.String())
 
-	return nil
+	return parsedCert.NotAfter, nil
 }
 
 func writeZipFile(name string, contents []byte) error {
