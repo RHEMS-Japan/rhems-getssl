@@ -166,6 +166,11 @@ func main() {
 			} else {
 				createWildCert(info, info.WildcardDomain, clientSet)
 			}
+			if cloud == "aws" {
+				checkIngress(clientSet, info.Ingresses)
+			} else {
+				checkSecret(clientSet, info.Secrets)
+			}
 		} else {
 			for _, domain := range info.Domains {
 				if !force {
@@ -723,5 +728,76 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 		fmt.Println("Certificate ID: ", certId)
 		editCertSecret(domain, certId, secretName, namespace)
 		postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
+	}
+}
+
+func checkSecret(clientSet *kubernetes.Clientset, secrets []Secret) {
+	var checkSecrets []CheckSecret
+	for _, info := range secrets {
+		secretInterface := clientSet.CoreV1().Secrets(info.Namespace)
+		result, err := secretInterface.Get(context.TODO(), info.SecretName, metav1.GetOptions{})
+		if err != nil {
+			checkSecrets = append(checkSecrets, CheckSecret{info.Namespace, info.SecretName, ""})
+			continue
+		}
+		checkSecrets = append(checkSecrets, CheckSecret{info.Namespace, info.SecretName, string(result.Data["qcloud_cert_id"])})
+	}
+
+	for _, secret := range checkSecrets {
+		fmt.Println("Namespace: ", secret.Namespace)
+		fmt.Println("Secret Name: ", secret.SecretName)
+		fmt.Println("Certificate ID: ", secret.CertificateID)
+
+		response, err := getCertTencent(secret.CertificateID)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		}
+
+		err = readCert(response.Response.Content)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		}
+	}
+}
+
+func checkIngress(clientSet *kubernetes.Clientset, ingresses []Ingress) {
+	var checkIngresses []CheckIngress
+	for _, info := range ingresses {
+		ingressInterface := clientSet.NetworkingV1().Ingresses(info.Namespace)
+		result, err := ingressInterface.Get(context.TODO(), info.IngressName, metav1.GetOptions{})
+		if err != nil {
+			checkIngresses = append(checkIngresses, CheckIngress{info.Namespace, info.IngressName, ""})
+			continue
+		}
+		certArn, ok := result.Annotations["alb.ingress.kubernetes.io/certificate-arn"]
+		if !ok {
+			checkIngresses = append(checkIngresses, CheckIngress{info.Namespace, info.IngressName, ""})
+			continue
+		}
+		checkIngresses = append(checkIngresses, CheckIngress{info.Namespace, info.IngressName, certArn})
+	}
+
+	for _, ingress := range checkIngresses {
+		fmt.Println("Namespace: ", ingress.Namespace)
+		fmt.Println("Ingress Name: ", ingress.IngressName)
+		fmt.Println("Certificate ARN: ", ingress.CertificateARN)
+
+		cert, err := getCertAWS(ingress.CertificateARN)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		}
+
+		err = readCert(*cert.Certificate)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		}
 	}
 }
