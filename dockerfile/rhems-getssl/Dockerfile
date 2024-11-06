@@ -1,9 +1,9 @@
 FROM golang:1.23.2-alpine3.20 AS create-cert
 WORKDIR /tmp/create-cert
-COPY go.mod go.sum ./
-COPY create-cert.go ./
+COPY ./create-cert/go.mod ./create-cert/go.sum ./
+COPY ./create-cert/create-cert.go ./create-cert/check-remote-cert.go ./
 RUN go mod download
-RUN go build -ldflags="-w -s" -o ./create-cert ./create-cert.go
+RUN go build -ldflags="-w -s" -o ./create-cert ./create-cert.go ./check-remote-cert.go
 
 FROM golang:1.23.2-alpine3.20 AS dns_edit_route53
 WORKDIR /tmp/dns_edit_route53

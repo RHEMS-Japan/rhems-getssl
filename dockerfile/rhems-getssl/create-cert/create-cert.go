@@ -74,6 +74,24 @@ type Badges struct { // RHEMS Badges API 用
 	Log          string `json:"log"`
 }
 
+type CheckIngress struct {
+	Namespace      string
+	IngressName    string
+	CertificateARN string
+}
+
+type CheckSecret struct {
+	Namespace     string
+	SecretName    string
+	CertificateID string
+}
+
+type Cert struct {
+	ID       string
+	Valid    bool
+	NotAfter time.Time
+}
+
 var yamlFile string               // -f flag
 var cloud string                  // -c flag
 var initialize bool               // -i flag
@@ -153,6 +171,11 @@ func main() {
 				postToBadges(info.WildcardDomain, true, "Certificate is still valid", fmt.Sprintf("Expire Date: %s", expireDate), 0)
 			} else {
 				createWildCert(info, info.WildcardDomain, clientSet)
+			}
+			if cloud == "aws" {
+				checkIngress(clientSet, info.Ingresses, info.WildcardDomain)
+			} else {
+				checkSecret(clientSet, info.Secrets, info.WildcardDomain)
 			}
 		} else {
 			for _, domain := range info.Domains {
@@ -568,12 +591,20 @@ func checkCertValidation(url string) (bool, string) {
 	fmt.Println("Update Before Day: ", updateBeforeDay)
 	fmt.Println("しきい値: ", expireTime.Add(-24*time.Duration(updateBeforeDay)*time.Hour))
 
-	if time.Now().After(expireTime.Add(-24 * time.Duration(updateBeforeDay) * time.Hour)) {
-		fmt.Println("Certificate needs to be updated")
-		return false, ""
-	} else {
+	if isCertTimeValid(expireTime) {
 		fmt.Println("Certificate is still valid")
 		return true, expireJSTDate
+	} else {
+		fmt.Println("Certificate needs to be updated")
+		return false, ""
+	}
+}
+
+func isCertTimeValid(certNotAfter time.Time) bool {
+	if time.Now().After(certNotAfter.Add(-24 * time.Duration(updateBeforeDay) * time.Hour)) {
+		return false
+	} else {
+		return true
 	}
 }
 
@@ -711,5 +742,104 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 		fmt.Println("Certificate ID: ", certId)
 		editCertSecret(domain, certId, secretName, namespace)
 		postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
+	}
+}
+
+func checkSecret(clientSet *kubernetes.Clientset, secrets []Secret, domain string) {
+	var checkSecrets []CheckSecret
+	certIdCount := make(map[string]int)
+	for _, info := range secrets {
+		secretInterface := clientSet.CoreV1().Secrets(info.Namespace)
+		result, err := secretInterface.Get(context.TODO(), info.SecretName, metav1.GetOptions{})
+		if err != nil {
+			checkSecrets = append(checkSecrets, CheckSecret{info.Namespace, info.SecretName, ""})
+			continue
+		}
+		checkSecrets = append(checkSecrets, CheckSecret{info.Namespace, info.SecretName, string(result.Data["qcloud_cert_id"])})
+		certIdCount[string(result.Data["qcloud_cert_id"])] += 1
+	}
+
+	var mostLongValidCertId string
+	var mostLongValidCertNotAfter time.Time
+	for certId, _ := range certIdCount {
+		cert, err := getCertTencent(certId)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		} else if cert == nil {
+			continue
+		}
+
+		notAfter, err := readCert(cert.Response.Content)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		}
+
+		if isCertTimeValid(notAfter) {
+			if notAfter.After(mostLongValidCertNotAfter) {
+				mostLongValidCertId = certId
+				mostLongValidCertNotAfter = notAfter
+			}
+		}
+	}
+
+	for _, secret := range checkSecrets {
+		if secret.CertificateID != mostLongValidCertId {
+			editCertSecret(domain, mostLongValidCertId, secret.SecretName, secret.Namespace)
+		}
+	}
+}
+
+func checkIngress(clientSet *kubernetes.Clientset, ingresses []Ingress, domain string) {
+	var checkIngresses []CheckIngress
+	certARNCount := make(map[string]int)
+	for _, info := range ingresses {
+		ingressInterface := clientSet.NetworkingV1().Ingresses(info.Namespace)
+		result, err := ingressInterface.Get(context.TODO(), info.IngressName, metav1.GetOptions{})
+		if err != nil {
+			checkIngresses = append(checkIngresses, CheckIngress{info.Namespace, info.IngressName, ""})
+			continue
+		}
+		certArn, ok := result.Annotations["alb.ingress.kubernetes.io/certificate-arn"]
+		if !ok {
+			checkIngresses = append(checkIngresses, CheckIngress{info.Namespace, info.IngressName, ""})
+			continue
+		}
+		checkIngresses = append(checkIngresses, CheckIngress{info.Namespace, info.IngressName, certArn})
+		certARNCount[certArn] += 1
+	}
+
+	var mostLongValidCertARN string
+	var mostLongValidCertNotAfter time.Time
+	for certARN, _ := range certARNCount {
+		cert, err := getCertAWS(certARN)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		}
+
+		notAfter, err := readCert(*cert.Certificate)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		}
+
+		if isCertTimeValid(notAfter) {
+			if notAfter.After(mostLongValidCertNotAfter) {
+				mostLongValidCertARN = certARN
+				mostLongValidCertNotAfter = notAfter
+			}
+		}
+	}
+
+	for _, ingress := range checkIngresses {
+		if ingress.CertificateARN != mostLongValidCertARN {
+			editIngress(domain, clientSet, ingress.Namespace, ingress.IngressName, mostLongValidCertARN)
+		}
 	}
 }
