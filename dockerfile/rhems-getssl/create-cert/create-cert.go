@@ -86,6 +86,12 @@ type CheckSecret struct {
 	CertificateID string
 }
 
+type Cert struct {
+	ID       string
+	Valid    bool
+	NotAfter time.Time
+}
+
 var yamlFile string               // -f flag
 var cloud string                  // -c flag
 var initialize bool               // -i flag
@@ -753,37 +759,37 @@ func checkSecret(clientSet *kubernetes.Clientset, secrets []Secret, domain strin
 		certIdCount[string(result.Data["qcloud_cert_id"])] += 1
 	}
 
-	var mostUsedCertId string
-	var mostUsedCertCount int
-	for certId, count := range certIdCount {
-		if count > mostUsedCertCount {
-			mostUsedCertId = certId
+	var mostLongValidCertId string
+	var mostLongValidCertNotAfter time.Time
+	for certId, _ := range certIdCount {
+		cert, err := getCertTencent(certId)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		} else if cert == nil {
+			continue
 		}
-	}
 
-	response, err := getCertTencent(mostUsedCertId)
-	if err != nil {
-		fmt.Println(err.Error())
-		postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
-		os.Exit(1)
-	}
+		notAfter, err := readCert(cert.Response.Content)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		}
 
-	notAfter, err := readCert(response.Response.Content)
-	if err != nil {
-		fmt.Println(err.Error())
-		postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
-		os.Exit(1)
-	}
-
-	if isCertTimeValid(notAfter) {
-		fmt.Println("Most used certificate is still valid")
-		for _, secret := range checkSecrets {
-			if secret.CertificateID != mostUsedCertId {
-				editCertSecret(domain, mostUsedCertId, secret.SecretName, secret.Namespace)
+		if isCertTimeValid(notAfter) {
+			if notAfter.After(mostLongValidCertNotAfter) {
+				mostLongValidCertId = certId
+				mostLongValidCertNotAfter = notAfter
 			}
 		}
-	} else {
-		fmt.Println("Most used certificate needs to be updated")
+	}
+
+	for _, secret := range checkSecrets {
+		if secret.CertificateID != mostLongValidCertId {
+			editCertSecret(domain, mostLongValidCertId, secret.SecretName, secret.Namespace)
+		}
 	}
 }
 
@@ -806,36 +812,34 @@ func checkIngress(clientSet *kubernetes.Clientset, ingresses []Ingress, domain s
 		certARNCount[certArn] += 1
 	}
 
-	var mostUsedCertARN string
-	var mostUsedCertCount int
-	for certARN, count := range certARNCount {
-		if count > mostUsedCertCount {
-			mostUsedCertARN = certARN
+	var mostLongValidCertARN string
+	var mostLongValidCertNotAfter time.Time
+	for certARN, _ := range certARNCount {
+		cert, err := getCertAWS(certARN)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+			os.Exit(1)
 		}
-	}
 
-	cert, err := getCertAWS(mostUsedCertARN)
-	if err != nil {
-		fmt.Println(err.Error())
-		postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
-		os.Exit(1)
-	}
+		notAfter, err := readCert(*cert.Certificate)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		}
 
-	notAfter, err := readCert(*cert.Certificate)
-	if err != nil {
-		fmt.Println(err.Error())
-		postToBadges(os.Getenv("BRANCH"), false, "get cert error", err.Error(), 0)
-		os.Exit(1)
-	}
-
-	if isCertTimeValid(notAfter) {
-		fmt.Println("Most used certificate is still valid")
-		for _, ingress := range checkIngresses {
-			if ingress.CertificateARN != mostUsedCertARN {
-				editIngress(domain, clientSet, ingress.Namespace, ingress.IngressName, mostUsedCertARN)
+		if isCertTimeValid(notAfter) {
+			if notAfter.After(mostLongValidCertNotAfter) {
+				mostLongValidCertARN = certARN
+				mostLongValidCertNotAfter = notAfter
 			}
 		}
-	} else {
-		fmt.Println("Most used certificate needs to be updated")
+	}
+
+	for _, ingress := range checkIngresses {
+		if ingress.CertificateARN != mostLongValidCertARN {
+			editIngress(domain, clientSet, ingress.Namespace, ingress.IngressName, mostLongValidCertARN)
+		}
 	}
 }

@@ -41,12 +41,15 @@ func getCertTencent(id string) (*TencentCertResponse, error) {
 
 	response, err := client.DownloadCertificate(request)
 	if _, ok := err.(*errors.TencentCloudSDKError); ok {
-		fmt.Printf("An API error has returned: %s", err)
-		return nil, err
-	}
-	if err != nil {
-		fmt.Println(err.Error())
-		return nil, err
+		pattern := `.*Code=FailedOperation.CertificateNotFound, Message=Certificate does not exist..*`
+		match, _ := regexp.MatchString(pattern, err.Error())
+		if match {
+			fmt.Println("Certificate not found")
+			return nil, nil
+		} else {
+			fmt.Printf("An API error has returned: %s", err)
+			return nil, err
+		}
 	}
 
 	var certResponse TencentCertResponse
