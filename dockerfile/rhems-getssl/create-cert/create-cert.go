@@ -153,10 +153,15 @@ func main() {
 	for _, info := range config.Info {
 		fmt.Println("Namespace: ", info.Namespace)
 		fmt.Println("Ingress Name: ", info.IngressName)
+		fmt.Println("Secret Name: ", info.SecretName)
 		fmt.Println("Domains: ", info.Domains)
+		fmt.Println("Wildcard Domain: ", info.WildcardDomain)
+		fmt.Println("Wildcard Sans: ", info.WildCardSans)
 
-		if info.WildcardDomain != "" {
-			if !force {
+		if info.WildcardDomain != "" { // ワイルドカード証明書の場合
+			if force {
+				createWildCert(info, info.WildcardDomain, clientSet)
+			} else {
 				var isNotExpire bool
 				var expireDate string
 				for _, checkDomain := range info.CheckDomains {
@@ -169,17 +174,17 @@ func main() {
 					}
 				}
 				postToBadges(info.WildcardDomain, true, "Certificate is still valid", fmt.Sprintf("Expire Date: %s", expireDate), 0)
-			} else {
-				createWildCert(info, info.WildcardDomain, clientSet)
 			}
 			if cloud == "aws" {
 				checkIngress(clientSet, info.Ingresses, info.WildcardDomain)
 			} else {
 				checkSecret(clientSet, info.Secrets, info.WildcardDomain)
 			}
-		} else {
+		} else { // 通常証明書の場合
 			for _, domain := range info.Domains {
-				if !force {
+				if force {
+					createCert(info, domain, clientSet)
+				} else {
 					isNotExpire, expireDate := checkCertValidation(domain)
 					if isNotExpire {
 						postToBadges(domain, true, "Certificate is still valid", fmt.Sprintf("Expire Date: %s", expireDate), 0)
@@ -187,8 +192,6 @@ func main() {
 					} else {
 						createCert(info, domain, clientSet)
 					}
-				} else {
-					createCert(info, domain, clientSet)
 				}
 			}
 		}
@@ -226,7 +229,10 @@ func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 		fmt.Println("Ingress Name: ", info.IngressName)
 		fmt.Println("Secret Name: ", info.SecretName)
 		fmt.Println("Domains: ", info.Domains)
+		fmt.Println("Wildcard Domain: ", info.WildcardDomain)
+		fmt.Println("Wildcard Sans: ", info.WildCardSans)
 
+		// getsslの初期化スクリプトを実行
 		for _, domain := range info.Domains {
 			cmd := exec.Command("/tmp/init.sh", domain, letsEncryptEnvironment)
 			output, err := cmd.CombinedOutput()
@@ -238,6 +244,7 @@ func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 			fmt.Println("Output: \n", string(output))
 		}
 
+		// ワイルドカード証明書の場合、それに合わせてgetsslの初期化スクリプトを実行
 		if info.WildcardDomain != "" {
 			cmd := exec.Command("/tmp/init.sh", info.WildcardDomain, letsEncryptEnvironment)
 			output, err := cmd.CombinedOutput()
@@ -248,6 +255,7 @@ func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 			}
 			fmt.Println("Output: \n", string(output))
 
+			// SANsの設定が合った場合、さらにgetsslの設定ファイルを変更
 			if info.WildCardSans != nil {
 				sans := ""
 				for _, domain := range info.WildCardSans {
@@ -375,8 +383,8 @@ func uploadCertAWS(domain string, certificate []byte, privateKey []byte, certifi
 	client := acm.NewFromConfig(cfg)
 
 	input := &acm.ImportCertificateInput{
-		Certificate:      certificate, // Required
-		PrivateKey:       privateKey,  // Required
+		Certificate:      certificate,
+		PrivateKey:       privateKey,
 		CertificateChain: certificateChain,
 	}
 
