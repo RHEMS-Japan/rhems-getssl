@@ -165,12 +165,12 @@ func checkTencentCert(certIds []string, domains []string) {
 
 		if isCertTimeInvalid(notAfter) {
 			fmt.Println("Certificate is invalid")
-			//response, err := deleteTencentCert(certId)
-			//if err != nil {
-			//	fmt.Println(err.Error())
-			//	os.Exit(1)
-			//}
-			//fmt.Println(response)
+			response, err := deleteTencentCert(certId)
+			if err != nil {
+				fmt.Println(err.Error())
+				os.Exit(1)
+			}
+			fmt.Println(response)
 		} else {
 			fmt.Println("Certificate is valid")
 		}
@@ -226,12 +226,12 @@ func checkAWSCert(certARNs []string, domains []string) {
 
 		if isCertTimeInvalid(notAfter) {
 			fmt.Println("Certificate is invalid")
-			//response, err := deleteAWSCert(certARN)
-			//if err != nil {
-			//	fmt.Println(err.Error())
-			//	os.Exit(1)
-			//}
-			//fmt.Println(response)
+			response, err := deleteAWSCert(certARN)
+			if err != nil {
+				fmt.Println(err.Error())
+				os.Exit(1)
+			}
+			fmt.Println(response)
 		} else {
 			fmt.Println("Certificate is valid")
 		}
@@ -248,7 +248,7 @@ func deleteTencentCert(certId string) (*ssl.DeleteCertificateResponse, error) {
 
 	request := ssl.NewDeleteCertificateRequest()
 
-	request.CertificateId = common.StringPtr("test123")
+	request.CertificateId = common.StringPtr(certId)
 
 	response, err := client.DeleteCertificate(request)
 	if _, ok := err.(*errors.TencentCloudSDKError); ok {
