@@ -19,6 +19,12 @@ COPY go-server/server.go ./
 RUN go mod download
 RUN go build -ldflags="-w -s" -o ./server ./server.go
 
+FROM alpine:3.20.3 AS kubectl
+WORKDIR /tmp/kubectl
+RUN apk add curl bash
+COPY ./kubectl-install.sh /tmp/kubectl/kubectl-install.sh
+RUN chmod +x kubectl-install.sh && /bin/bash kubectl-install.sh
+
 FROM alpine:3.20.3
 
 # Install necessary packages
@@ -28,12 +34,6 @@ RUN apk add --no-cache bind-tools jq unzip sudo curl bash openssl git
 WORKDIR /tmp/getssl
 RUN curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl ; chmod 700 getssl
 
-# Install kubectl
-WORKDIR /tmp/kubectl
-RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
-      && mv kubectl /usr/local/bin/kubectl \
-      && chmod +x /usr/local/bin/kubectl
-
 # Create a directory for the acme-challenge
 RUN mkdir -p /var/www/html/.well-known/acme-challenge && chmod 777 /var/www/html/.well-known/acme-challenge
 
@@ -42,6 +42,8 @@ COPY --from=create-cert /tmp/create-cert/create-cert /tmp/create-cert
 COPY --from=dns_edit_route53 /tmp/dns_edit_route53/dns_edit_route53 /tmp/dns_edit_route53
 
 COPY --from=go-server /tmp/go-server/server /root/server
+
+COPY --from=kubectl /tmp/kubectl/kubectl /usr/local/bin/kubectl
 
 COPY ./init.sh /tmp/init.sh
 RUN chmod +x /tmp/init.sh
