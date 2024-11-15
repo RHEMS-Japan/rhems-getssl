@@ -145,14 +145,10 @@ func checkTencentCert(certIds []string, domains []string) {
 					fmt.Println(strings.Join(nakedSAN, "."))
 					if strings.Join(nakedDomain, ".") == strings.Join(nakedSAN, ".") {
 						isMatch = true
-					} else {
-						continue
 					}
 				} else {
 					if subjectAltName == domain {
 						isMatch = true
-					} else {
-						continue
 					}
 				}
 			}
@@ -165,12 +161,12 @@ func checkTencentCert(certIds []string, domains []string) {
 
 		if isCertTimeInvalid(notAfter) {
 			fmt.Println("Certificate is invalid")
-			response, err := deleteTencentCert(certId)
-			if err != nil {
-				fmt.Println(err.Error())
-				os.Exit(1)
-			}
-			fmt.Println(response)
+			//response, err := deleteTencentCert(certId)
+			//if err != nil {
+			//	fmt.Println(err.Error())
+			//	os.Exit(1)
+			//}
+			//fmt.Println(response)
 		} else {
 			fmt.Println("Certificate is valid")
 		}
@@ -206,14 +202,10 @@ func checkAWSCert(certARNs []string, domains []string) {
 					fmt.Println(strings.Join(nakedSAN, "."))
 					if strings.Join(nakedDomain, ".") == strings.Join(nakedSAN, ".") {
 						isMatch = true
-					} else {
-						continue
 					}
 				} else {
 					if subjectAltName == domain {
 						isMatch = true
-					} else {
-						continue
 					}
 				}
 			}
@@ -226,12 +218,12 @@ func checkAWSCert(certARNs []string, domains []string) {
 
 		if isCertTimeInvalid(notAfter) {
 			fmt.Println("Certificate is invalid")
-			response, err := deleteAWSCert(certARN)
-			if err != nil {
-				fmt.Println(err.Error())
-				os.Exit(1)
-			}
-			fmt.Println(response)
+			//response, err := deleteAWSCert(certARN)
+			//if err != nil {
+			//	fmt.Println(err.Error())
+			//	os.Exit(1)
+			//}
+			//fmt.Println(response)
 		} else {
 			fmt.Println("Certificate is valid")
 		}
