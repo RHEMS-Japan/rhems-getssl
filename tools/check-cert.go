@@ -65,5 +65,14 @@ func checkCertValidation(url string) {
 	fmt.Println("Update Before Day: ", updateBeforeDay)
 	fmt.Println("しきい値: ", expireTime.Add(-24*time.Duration(updateBeforeDay)*time.Hour))
 	fmt.Println("しきい値 JST: ", expireJSTTime.Add(-24*time.Duration(updateBeforeDay)*time.Hour))
+	fmt.Println("Cert Time Valid: ", isCertTimeValid(expireTime))
 	fmt.Println("")
+}
+
+func isCertTimeValid(certNotAfter time.Time) bool {
+	if time.Now().After(certNotAfter.Add(-24 * time.Duration(updateBeforeDay) * time.Hour)) {
+		return false
+	} else {
+		return true
+	}
 }
