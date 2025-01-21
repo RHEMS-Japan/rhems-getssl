@@ -796,7 +796,11 @@ func checkSecret(clientSet *kubernetes.Clientset, secrets []Secret, domain strin
 
 	for _, secret := range checkSecrets {
 		if secret.CertificateID != mostLongValidCertId {
-			editCertSecret(domain, mostLongValidCertId, secret.SecretName, secret.Namespace)
+			if mostLongValidCertId == "" {
+				fmt.Println("Certificate ID is empty")
+			} else {
+				editCertSecret(domain, mostLongValidCertId, secret.SecretName, secret.Namespace)
+			}
 		}
 	}
 }
@@ -847,7 +851,11 @@ func checkIngress(clientSet *kubernetes.Clientset, ingresses []Ingress, domain s
 
 	for _, ingress := range checkIngresses {
 		if ingress.CertificateARN != mostLongValidCertARN {
-			editIngress(domain, clientSet, ingress.Namespace, ingress.IngressName, mostLongValidCertARN)
+			if mostLongValidCertARN == "" {
+				fmt.Println("Certificate ARN is empty")
+			} else {
+				editIngress(domain, clientSet, ingress.Namespace, ingress.IngressName, mostLongValidCertARN)
+			}
 		}
 	}
 }
