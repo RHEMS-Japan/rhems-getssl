@@ -170,6 +170,10 @@ func main() {
 						continue
 					} else {
 						createWildCert(info, info.WildcardDomain, clientSet)
+						isNotExpireCheck, expireDateCheck := checkCertValidation(checkDomain)
+						if !isNotExpireCheck {
+							postToBadges(info.WildcardDomain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDateCheck), 0)
+						}
 						break
 					}
 				}
@@ -184,6 +188,10 @@ func main() {
 			for _, domain := range info.Domains {
 				if force {
 					createCert(info, domain, clientSet)
+					isNotExpireCheck, expireDateCheck := checkCertValidation(domain)
+					if !isNotExpireCheck {
+						postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDateCheck), 0)
+					}
 				} else {
 					isNotExpire, expireDate := checkCertValidation(domain)
 					if isNotExpire {
@@ -191,6 +199,10 @@ func main() {
 						continue
 					} else {
 						createCert(info, domain, clientSet)
+						isNotExpireCheck, expireDateCheck := checkCertValidation(domain)
+						if !isNotExpireCheck {
+							postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDateCheck), 0)
+						}
 					}
 				}
 			}
