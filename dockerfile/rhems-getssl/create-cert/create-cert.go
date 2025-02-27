@@ -749,8 +749,9 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 		editIngress(domain, clientSet, namespace, ingressName, certId)
 		time.Sleep(10 * time.Second)
 		isNotExpireCheck, expireDateCheck := checkCertValidation(checkDomain, domain) // 更新後の証明書の有効期限チェック
-		if !isNotExpireCheck {
+		if !isNotExpireCheck && !force {
 			postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDateCheck), 0)
+			os.Exit(1)
 		} else {
 			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
 		}
@@ -759,8 +760,9 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 		editCertSecret(domain, certId, secretName, namespace)
 		time.Sleep(10 * time.Second)
 		isNotExpireCheck, expireDateCheck := checkCertValidation(checkDomain, domain) // 更新後の証明書の有効期限チェック
-		if !isNotExpireCheck {
+		if !isNotExpireCheck && !force {
 			postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDateCheck), 0)
+			os.Exit(1)
 		} else {
 			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
 		}
