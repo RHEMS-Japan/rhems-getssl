@@ -2,7 +2,7 @@
 
 ![docker-hub](https://img.shields.io/docker/automated/rhemsjapan/rhems-getssl)
 
-Let's Encryptより証明書を取得し各種クラウドKubernetes環境にて証明書の更新を自動で行うシステムです。
+[srvrco/getssl](https://github.com/srvrco/getssl?tab=readme-ov-file)スクリプトを使用し各種クラウドKubernetes環境にてLet's Encrypt発行の無料証明書の取得・管理・更新を自動で行うシステムです。
 HTTP-01 チャレンジとDNS-01 チャレンジの両方に対応しています。
 また、DNS-01 チャレンジの場合は現在のところAWS Route53のみ対応しています。
 
