@@ -321,7 +321,7 @@ spec:
                     fieldRef:
                       fieldPath: metadata.namespace
                 - name: API_TOKEN
-                  value: __BADGE_API_TOKEN__ # rhems-badgeのAPIトークン
+                  value: __BADGE_API_TOKEN__ # rhems-badgesのAPIトークン
                 - name: ORGANIZATION
                   value: __ORGANIZATION__ # organization名
                 - name: REPO
@@ -358,7 +358,7 @@ spec:
                     fieldRef:
                       fieldPath: metadata.namespace
                 - name: API_TOKEN
-                  value: __BADGE_API_TOKEN__ # rhems-badgeのAPIトークン
+                  value: __BADGE_API_TOKEN__ # rhems-badgesのAPIトークン
                 - name: ORGANIZATION
                   value: __ORGANIZATION__ # organization名
                 - name: REPO

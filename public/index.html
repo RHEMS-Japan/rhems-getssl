@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <title>RHEMS GETSSL</title>
+    <link rel="icon" href="img/favicon.ico" />
+    <meta name="description" content="RHEMS GETSSL is a tool that allows you to easily get ssl certificate for https hosting.">
+    <meta name="keyword" content="RHEMS GETSSL, k8s, get ssl">
+    <meta charset="utf-8">
+    <style>
+        .button_wrapper{
+            text-align:center;
+        }
+        p.img_center{
+            text-align: center;
+        }
+        h1{
+            text-align: center;
+        }
+        h4{
+            text-align: center;
+        }
+        code {font-size: 100%;}
+        p.varifont { color: #0000ff;}
+        pre code {
+            background-color: #eee;
+            border: 1px solid #999;
+            display: block;
+            padding: 20px;
+            width: 90%;
+            height: 70%;
+            /* overflow: scroll; */
+            overflow-y: scroll;
+            margin: 0 auto;
+        }
+        ::-webkit-scrollbar {
+            -webkit-appearance: none;
+            width: 7px;
+        }
+        ::-webkit-scrollbar-thumb {
+            border-radius: 1px;
+            background-color: rgba(0,0,0,.1);
+            box-shadow: 0 0 1px rgba(255,255,255,.5);
+        }
+    </style>
+
+</head>
+<body>
+<div align="right">
+    <a href="https://github.com/RHEMS-Japan/rhems-getssl" target="_blank">
+        <img src="https://badges.rhems-japan.com/api-get-badge.svg?user_id=3ngil1i7Z8VQEL9MpetN&organization=RHEMS-Japan&repo=rhems-getssl&app=rhems-getssl&branch=main" alt="">
+    </a>
+</div>
+<h1>RHEMS GETSSL</h1>
+<p class="img_center">
+    <img src="img/logo.jpg" alt="logo" width="25%" height="25%">
+</p>
+<h4>support below</h4>
+<div align="center">
+    <a href="https://aws.amazon.com/" target="_blank"><img src="img/AWS.png" alt="AWS" width="30" height="30"></a>
+    <a href="https://www.tencentcloud.com/" target="_blank"><img src="img/Tencent.png" alt="Tencent Cloud" width="30" height="30"></a>
+</div>
+
+<pre><code><h2>使用方法 DNS-01 チャレンジの場合</h2>
+
+DNS-01 チャレンジ(DNSのTXTレコードによる認証)を使用する場合は以下の手順に従ってください。
+また、DNS-01 チャレンジではWildcard証明書の取得が可能です。 Wildcard証明書を取得、更新するモードでは証明書の同期も行われます。
+今のところDNSサービスはAWS Route53のみ対応しています。
+その他詳細はgithubのREADMEを参照してください。
+
+<h3>1. 準備</h3>
+dns-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgesの各種変数を設定してください。
+# 一部抜粋
+spec:
+  timeZone: Asia/Tokyo
+  schedule: "0 0 * * *" # cronの設定
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          initContainers:
+            - name: init-getssl
+              image: rhems-getssl-job
+              imagePullPolicy: IfNotPresent
+              command:
+                - ./create-cert
+              args:
+                - '-i=true'
+                - '-f'
+                - '/root/config.yml'
+                - '-dns-validation=true' # DNS-01 チャレンジのためこのオプションを追加してください。
+              env:
+                - name: TZ
+                  value: Asia/Tokyo
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: API_TOKEN
+                  value: __BADGE_API_TOKEN__ # rhems-badgesのAPIトークン
+                - name: ORGANIZATION
+                  value: __ORGANIZATION__ # organization名
+                - name: REPO
+                  value: __REPO__ # repo名
+                - name: APP
+                  value: __APP__ # app名
+                - name: BRANCH
+                  value: __BRANCH__ # branch名
+                - name: CRON
+                  value: "0 15 * * *" # rhems-badgesでのcronの設定 Etc/UTCなのでマニフェストの時間との違いに注意してください。
+                - name: GRACE_TIME
+                  value: "10" # cronの実行時間を考慮したグレースタイム
+                - name: SLACK_FAILED
+                  value: __SLACK_FAILED__ # slackの通知先
+                - name: SLACK_SUCCESS
+                  value: __SLACK_SUCCESS__ # slackの通知先
+          containers:
+            - name: rhems-getssl
+              image: rhems-getssl-job
+              imagePullPolicy: IfNotPresent
+              command:
+                - ./create-cert
+              args:
+                - '-c'
+                - 'aws' # 証明書をアップロードするクラウドサービス aws or tencent
+                - '-dns-validation=true' # DNS-01 チャレンジのためこのオプションを追加してください。
+                - '-force=true' #　強制的に証明書を取得し更新する場合はこのオプションを追加してください。
+                - '-update-before-day=30' # 有効期限から何日前以内に更新するかを設定する場合はこのオプションを追加してください。　デフォルトでは3日前に更新します。
+              env:
+                - name: TZ
+                  value: Asia/Tokyo
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: API_TOKEN
+                  value: __BADGE_API_TOKEN__ # rhems-badgesのAPIトークン
+                - name: ORGANIZATION
+                  value: __ORGANIZATION__ # organization名
+                - name: REPO
+                  value: __REPO__ # repo名
+                - name: APP
+                  value: __APP__ # app名
+                - name: BRANCH
+                  value: __BRANCH__ # branch名
+                - name: CRON
+                  value: "0 15 * * *" # rhems-badgesでのcronの設定 Etc/UTCなのでマニフェストの時間との違いに注意してください。
+                - name: GRACE_TIME
+                  value: "10" # cronの実行時間を考慮したグレースタイム
+                - name: SLACK_FAILED
+                  value: __SLACK_FAILED__ # slackの通知先
+                - name: SLACK_SUCCESS
+                  value: __SLACK_SUCCESS__ # slackの通知先
+
+dns-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。
+# tencentの場合
+info:
+  - wildcard_domain: "*.test-getssl.example.com"
+    wildcard_sans:
+      - "*.mail.test-getssl.example.com"
+      - "*.api.test-getssl.example.com"
+      - "*.admin.test-getssl.example.com"
+    check_domains:
+      - "cert.test-getssl.example.com"
+    secrets:
+      - namespace: application-1
+        secret_name: rhems-getssl-cert
+      - namespace: application-2
+        secret_name: rhems-getssl-cert-2
+      - namespace: application-3
+        secret_name: rhems-getssl-cert-3
+---
+# awsの場合
+info:
+  - wildcard_domain: "*.test-getssl.example.com"
+    wildcard_sans:
+      - "*.mail.test-getssl.example.com"
+      - "*.api.test-getssl.example.com"
+      - "*.admin.test-getssl.example.com"
+    check_domains:
+      - "cert.test-getssl.example.com"
+    ingresses:
+      - namespace: application-1
+        ingress_name: rhems-getssl-ingress
+      - namespace: application-2
+        ingress_name: rhems-getssl-ingress-2
+      - namespace: application-3
+        ingress_name: rhems-getssl-ingress-3
+
+dns-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
+Tencentの場合でもRoute53にドメインを登録するためにAWSのKey/Secが必要です。
+# awsの場合
+apiVersion: v1
+kind: Secret
+metadata:
+  name: env
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: __AWS_ACCESS_KEY_ID__ # AWSのアクセスキー
+  AWS_SECRET_ACCESS_KEY: __AWS_SECRET_ACCESS_KEY__ # AWSのシークレットキー
+  AWS_DEFAULT_REGION: __AWS_DEFAULT_REGION__ # AWSのリージョン
+  AWS_DEFAULT_OUTPUT: json # AWSの出力形式
+---
+# tencentの場合
+apiVersion: v1
+kind: Secret
+metadata:
+  name: env
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: __AWS_ACCESS_KEY_ID__ # AWSのアクセスキー
+  AWS_SECRET_ACCESS_KEY: __AWS_SECRET_ACCESS_KEY__ # AWSのシークレットキー
+  AWS_DEFAULT_REGION: __AWS_DEFAULT_REGION__ # AWSのリージョン
+  AWS_DEFAULT_OUTPUT: json # AWSの出力形式
+  TENCENTCLOUD_SECRET_ID: __TENCENTCLOUD_SECRET_ID__
+  TENCENTCLOUD_SECRET_KEY: __TENCETCLOUD_SECRET_KEY__
+  TENCENTCLOUD_REGION: __TENCENTCLOUD_REGION__
+
+dns-kubernetes/rbac.ymlにて各種権限を設定してください。
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: getssl-job
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubectl-role-binding-getssl-job
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin # 権限を設定してください
+subjects:
+  - name: getssl-job
+    kind: ServiceAccount
+    namespace: rhems-getssl # namespace名
+
+dns-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。
+# 一部抜粋
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: rhems-getssl # namespace名
+
+<h3>2. デプロイ</h3>
+dns-kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。
+$ kubectl kustomize .
+
+問題が無ければkubectl applyコマンドを実行してください。
+$ kubectl apply -k .
+
+<h3>3. 確認</h3>
+Cronjobを手動で実行しエラー無く完了するかどうか確認を行って下さい。
+$ kubectl get cronjob
+NAME           SCHEDULE    SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+rhems-getssl   0 0 * * *   False     0        <none>          8m34s
+$ kubectl create job --from=cronjob/rhems-getssl rhems-getssl-manual-123456
+job.batch/rhems-getssl-manual-123456 created
+$ kubectl get pod
+NAME                               READY   STATUS      RESTARTS   AGE
+rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
+</code></pre>
+</body>
+</html>
