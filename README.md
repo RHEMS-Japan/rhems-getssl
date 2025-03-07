@@ -523,3 +523,7 @@ config.ymlより複数のIngress、Secretsに対しWildcard証明書を適用す
 
 `私たちの HTTP-01 チャレンジの実装は、リダイレクトを最大 10 回まで追跡します。 追跡されるのは、“http:” から “https:” へのリダイレクトで、80 番ポートから 443 番ポートへのリダイレクトのみです。 IP アドレスへのリダイレクトは許可されません。 HTTPS URL へのリダイレクトである場合、証明書の検証は行いません (というのも、このチャレンジは、有効な証明書のブートストラップを意図したものであり、HTTPS URL へのリダイレクトの場合、途中で自己署名証明書や有効期限切れの証明書が存在する可能性があるためです)。`
 https://letsencrypt.org/ja/docs/challenge-types/
+
+## フロー図
+
+![rhems-getssl-flow](public/img/rhems-getssl-flow.png)
