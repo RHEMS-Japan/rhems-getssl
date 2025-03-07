@@ -22,7 +22,7 @@ HTTP-01 チャレンジ(HTTPアクセスによるトークン認証)を使用す
 
 ### 1. 準備
 
-http-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgeの各種変数を設定してください。
+http-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgesの各種変数を設定してください。
 ```yaml
 # 一部抜粋
 spec:
