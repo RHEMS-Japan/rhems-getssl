@@ -526,4 +526,4 @@ https://letsencrypt.org/ja/docs/challenge-types/
 
 ## フロー図
 
-![rhems-getssl-flow](public/img/rhems_getssl_flow.jpg)
+![rhems-getssl-flow](public/img/rhems-getssl-flow-resize.png)
