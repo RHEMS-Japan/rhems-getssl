@@ -748,23 +748,31 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 		fmt.Println("Certificate ARN: ", certId)
 		editIngress(domain, clientSet, namespace, ingressName, certId)
 		time.Sleep(10 * time.Second)
-		isNotExpireCheck, expireDateCheck := checkCertValidation(checkDomain, domain) // 更新後の証明書の有効期限チェック
-		if !isNotExpireCheck && !force {
-			postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDateCheck), 0)
-			os.Exit(1)
-		} else {
+		if force {
 			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
+		} else {
+			isNotExpireCheck, expireDateCheck := checkCertValidation(checkDomain, domain) // 更新後の証明書の有効期限チェック
+			if !isNotExpireCheck {
+				postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDateCheck), 0)
+				os.Exit(1)
+			} else {
+				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
+			}
 		}
 	} else {
 		fmt.Println("Certificate ID: ", certId)
 		editCertSecret(domain, certId, secretName, namespace)
 		time.Sleep(10 * time.Second)
-		isNotExpireCheck, expireDateCheck := checkCertValidation(checkDomain, domain) // 更新後の証明書の有効期限チェック
-		if !isNotExpireCheck && !force {
-			postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDateCheck), 0)
-			os.Exit(1)
+		if force {
+			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
 		} else {
-			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
+			isNotExpireCheck, expireDateCheck := checkCertValidation(checkDomain, domain) // 更新後の証明書の有効期限チェック
+			if !isNotExpireCheck {
+				postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDateCheck), 0)
+				os.Exit(1)
+			} else {
+				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
+			}
 		}
 	}
 }
