@@ -424,6 +424,27 @@ func uploadCertTencent(domain string, certificate []byte, privateKey []byte) *ss
 	return response
 }
 
+func uploadCertSecret(domain string, certificate []byte, privateKey []byte, certificateFileName string, privateKeyFileName string, certificateSecretName string, privateKeySecretName string, namespace string) string {
+	exec.Command("cp", "cert-secret-base.yml", "cert-secret.yml").Run()
+
+	replaceStringInFile("cert-secret.yml", "__CERT_PEM_SECRET_NAME__", certificateSecretName)
+	replaceStringInFile("cert-secret.yml", "__CERT_PEM_NAME__", certificateFileName)
+	replaceStringInFile("cert-secret.yml", "__CERT_PEM__", b64.StdEncoding.EncodeToString(certificate))
+
+	replaceStringInFile("cert-secret.yml", "__CERT_KEY_SECRET_NAME__", privateKeySecretName)
+	replaceStringInFile("cert-secret.yml", "__CERT_KEY_NAME__", privateKeyFileName)
+	replaceStringInFile("cert-secret.yml", "__CERT_KEY__", b64.StdEncoding.EncodeToString(privateKey))
+
+	output, err := exec.Command("kubectl", "apply", "-f", "cert-secret.yml", "-n", namespace).CombinedOutput()
+	if err != nil {
+		fmt.Println(string(output))
+		postToBadges(domain, false, "cert-secret.yml apply error", string(output), 0)
+		os.Exit(1)
+	}
+
+	return string(output)
+}
+
 // TKE用証明書IDSecretの作成、更新
 func editCertSecret(domain string, certificateId string, secretName string, namespace string) {
 	exec.Command("rm", "secret.yml").Run()
