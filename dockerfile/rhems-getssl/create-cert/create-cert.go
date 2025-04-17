@@ -751,9 +751,9 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 		if force {
 			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
 		} else {
-			isNotExpireCheck, expireDateCheck := checkCertValidation(checkDomain, domain) // 更新後の証明書の有効期限チェック
-			if !isNotExpireCheck {
-				postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDateCheck), 0)
+			certCheck, expireDate := appliedCertCheck(checkDomain, checkDomain)
+			if !certCheck {
+				postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDate), 0)
 				os.Exit(1)
 			} else {
 				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
@@ -766,15 +766,32 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 		if force {
 			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
 		} else {
-			isNotExpireCheck, expireDateCheck := checkCertValidation(checkDomain, domain) // 更新後の証明書の有効期限チェック
-			if !isNotExpireCheck {
-				postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDateCheck), 0)
+			certCheck, expireDate := appliedCertCheck(checkDomain, checkDomain)
+			if !certCheck {
+				postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDate), 0)
 				os.Exit(1)
 			} else {
-				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
+				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
 			}
 		}
 	}
+}
+
+func appliedCertCheck(checkDomain string, domain string) (bool, string) {
+	status := false
+	expireDate := ""
+	for i := 0; i < 10; i++ {
+		isNotExpireCheck, expireDateCheck := checkCertValidation(checkDomain, domain)
+		expireDate = expireDateCheck
+		if isNotExpireCheck {
+			status = true
+			break
+		} else {
+			fmt.Println("Certificate is not applied yet")
+			time.Sleep(10 * time.Second)
+		}
+	}
+	return status, expireDate
 }
 
 func checkSecret(clientSet *kubernetes.Clientset, secrets []Secret, domain string) {

@@ -12,6 +12,8 @@ type Page struct {
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
+	uri := r.URL.Path[1:]
+	fmt.Fprintln(os.Stdout, "URI: ", uri)
 	fmt.Fprintln(os.Stdout, "File validation")
 	fileName := os.Getenv("FILE_NAME")
 	bytes, err := os.ReadFile("acme-challenge/" + fileName)
