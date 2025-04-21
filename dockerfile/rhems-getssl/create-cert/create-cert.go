@@ -770,18 +770,26 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 		if force {
 			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
 		} else {
-			// 証明書チェック機能
-			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
+			certCheck, expireDate := appliedCertCheck(checkDomain, checkDomain)
+			if !certCheck {
+				postToBadges(domain, true, "Certificate uploaded successfully", fmt.Sprintf("Certificate ARN: %s\n Please check manually. expireDate: %s", certId, expireDate), 0)
+			} else {
+				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
+			}
 		}
 	} else {
 		fmt.Println("Certificate ID: ", certId)
 		editCertSecret(domain, certId, secretName, namespace)
 		time.Sleep(10 * time.Second)
 		if force {
-			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
+			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
 		} else {
-			// 証明書チェック機能
-			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
+			certCheck, expireDate := appliedCertCheck(checkDomain, checkDomain)
+			if !certCheck {
+				postToBadges(domain, true, "Certificate uploaded successfully", fmt.Sprintf("Certificate ID: %s\n Please check manually. expireDate: %s", certId, expireDate), 0)
+			} else {
+				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
+			}
 		}
 	}
 }
