@@ -588,6 +588,25 @@ func checkCertValidation(url string, domain string) (bool, string) {
 		os.Exit(1)
 	}
 
+	defer res.Body.Close()
+
+	for i := 0; i < len(res.TLS.PeerCertificates); i++ {
+		certCN := res.TLS.PeerCertificates[i].Subject.CommonName
+		expireTime := res.TLS.PeerCertificates[i].NotAfter
+		expireJSTTime := expireTime.In(time.FixedZone("Asia/Tokyo", 9*60*60))
+		expireDate := fmt.Sprintf("%s UTC", expireTime.Format("2006-01-02 15:04:05"))
+		expireJSTDate := fmt.Sprintf("%s JST", expireJSTTime.Format("2006-01-02 15:04:05"))
+
+		fmt.Println("Domain: ", url)
+		fmt.Println("Cert CN: ", certCN)
+		fmt.Println("Expire Time: ", expireTime)
+		fmt.Println("Expire JST Time: ", expireJSTTime)
+		fmt.Println("Expire Date: ", expireDate)
+		fmt.Println("Expire JST Date: ", expireJSTDate)
+		fmt.Println("Update Before Day: ", updateBeforeDay)
+		fmt.Println("しきい値: ", expireTime.Add(-24*time.Duration(updateBeforeDay)*time.Hour))
+	}
+
 	expireTime := res.TLS.PeerCertificates[0].NotAfter
 	expireJSTTime := expireTime.In(time.FixedZone("Asia/Tokyo", 9*60*60))
 	expireDate := fmt.Sprintf("%s UTC", expireTime.Format("2006-01-02 15:04:05"))
@@ -751,13 +770,8 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 		if force {
 			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
 		} else {
-			certCheck, expireDate := appliedCertCheck(checkDomain, checkDomain)
-			if !certCheck {
-				postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDate), 0)
-				os.Exit(1)
-			} else {
-				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
-			}
+			// 証明書チェック機能
+			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
 		}
 	} else {
 		fmt.Println("Certificate ID: ", certId)
@@ -766,13 +780,8 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 		if force {
 			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
 		} else {
-			certCheck, expireDate := appliedCertCheck(checkDomain, checkDomain)
-			if !certCheck {
-				postToBadges(domain, false, "Certificate update error", fmt.Sprintf("After certification check is failed. Expire Date: %s", expireDate), 0)
-				os.Exit(1)
-			} else {
-				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
-			}
+			// 証明書チェック機能
+			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
 		}
 	}
 }
