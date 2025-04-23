@@ -168,13 +168,22 @@ func main() {
 			} else {
 				var isNotExpire bool
 				var expireDate string
-				for _, checkDomain := range info.CheckDomains {
-					isNotExpire, expireDate = checkCertValidation(checkDomain, info.WildcardDomain)
+				if info.CertFileName != "" {
+					isNotExpire, expireDate = checkSecretCert(clientSet, info.CertSecretName, info.CertFileName, info.Namespace, info.WildcardDomain)
 					if isNotExpire {
 						continue
 					} else {
-						createWildCert(info, info.WildcardDomain, clientSet, checkDomain)
-						break
+						createWildCert(info, info.WildcardDomain, clientSet, info.CheckDomains[0])
+					}
+				} else {
+					for _, checkDomain := range info.CheckDomains {
+						isNotExpire, expireDate = checkCertValidation(checkDomain, info.WildcardDomain)
+						if isNotExpire {
+							continue
+						} else {
+							createWildCert(info, info.WildcardDomain, clientSet, checkDomain)
+							break
+						}
 					}
 				}
 				if isNotExpire {
@@ -183,7 +192,7 @@ func main() {
 			}
 			if cloud == "aws" {
 				checkIngress(clientSet, info.Ingresses, info.WildcardDomain)
-			} else {
+			} else if cloud == "tencent" {
 				checkSecret(clientSet, info.Secrets, info.WildcardDomain)
 			}
 		} else { // 通常証明書の場合
@@ -948,4 +957,49 @@ func checkIngress(clientSet *kubernetes.Clientset, ingresses []Ingress, domain s
 			}
 		}
 	}
+}
+
+func checkSecretCert(clientSet *kubernetes.Clientset, certSecretName string, certFileName string, namespace string, domain string) (bool, string) {
+	certPem, err := getCertSecret(clientSet, certSecretName, certFileName, namespace)
+	if err != nil {
+		fmt.Println(err.Error())
+		postToBadges(domain, false, "get cert from secret error", err.Error(), 0)
+		os.Exit(1)
+	}
+
+	certs, err := splitCert(certPem)
+	if err != nil {
+		fmt.Println(err.Error())
+		postToBadges(domain, false, "split cert error", err.Error(), 0)
+		os.Exit(1)
+	}
+
+	isCertValid := true
+	var certNotAfter time.Time
+	for _, cert := range certs {
+		notAfter, err := readCert(cert)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(domain, false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		}
+
+		if isCertTimeValid(notAfter) {
+			fmt.Println("Certificate is still valid")
+		} else {
+			fmt.Println("Certificate needs to be updated")
+			isCertValid = false
+		}
+
+		if certNotAfter == (time.Time{}) {
+			certNotAfter = notAfter
+		} else if notAfter.After(certNotAfter) {
+			certNotAfter = notAfter
+		}
+	}
+
+	certNotAfterJST := certNotAfter.In(time.FixedZone("Asia/Tokyo", 9*60*60))
+	certNotAfterJSTDate := fmt.Sprintf("%s JST", certNotAfterJST.Format("2006-01-02 15:04:05"))
+
+	return isCertValid, certNotAfterJSTDate
 }

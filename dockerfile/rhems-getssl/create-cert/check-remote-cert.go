@@ -141,7 +141,7 @@ func getCertAWS(arn string) (*acm.GetCertificateOutput, error) {
 	return output, nil
 }
 
-func getCertSecret(clientSet *kubernetes.Clientset, secretName string, namespace string, certFileName string) (string, error) {
+func getCertSecret(clientSet *kubernetes.Clientset, secretName string, certFileName string, namespace string) (string, error) {
 	secret, err := clientSet.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		fmt.Println("Failed to get secret")
