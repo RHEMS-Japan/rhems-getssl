@@ -45,6 +45,10 @@ type Info struct { // 証明書情報
 	Namespace      string    `yaml:"namespace"`
 	IngressName    string    `yaml:"ingress_name"`
 	SecretName     string    `yaml:"secret_name"`
+	CertFileName   string    `yaml:"cert_file_name"`
+	KeyFileName    string    `yaml:"key_file_name"`
+	CertSecretName string    `yaml:"cert_secret_name"`
+	KeySecretName  string    `yaml:"key_secret_name"`
 	Domains        []string  `yaml:"domains"`
 	WildcardDomain string    `yaml:"wildcard_domain"`
 	WildCardSans   []string  `yaml:"wildcard_sans"`
@@ -322,7 +326,7 @@ func initKubeClient() *kubernetes.Clientset {
 }
 
 // 証明書アップロード処理
-func uploadCert(domain string, cloud string) string {
+func uploadCert(domain string, cloud string, info Info) string {
 	// getsslで作成された証明書ファイルのパス
 	certPath := fmt.Sprintf("/root/.getssl/%s/%s.crt", domain, domain)
 	fullCertChainPath := fmt.Sprintf("/root/.getssl/%s/%s_chain.pem", domain, domain)
@@ -363,13 +367,20 @@ func uploadCert(domain string, cloud string) string {
 		fmt.Println("Certificate ARN: ", *arn)
 
 		return *arn
-	} else {
+	} else if cloud == "tencent" {
 		response := uploadCertTencent(domain, fullCertChain, privateKey)
 
 		fmt.Println("Certificate uploaded successfully")
 		fmt.Println("Certificate response: ", response.ToJsonString())
 
 		return *response.Response.CertificateId
+	} else {
+		result := uploadCertSecret(domain, fullCertChain, privateKey, info.CertFileName, info.KeyFileName, info.CertSecretName, info.KeySecretName, info.Namespace)
+
+		fmt.Println("Certificate applied successfully")
+		fmt.Println("Certificate response: ", result)
+
+		return result
 	}
 }
 
@@ -674,7 +685,7 @@ func createCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 	if match {
 		fmt.Println("Certificate created successfully\ncertificate upload to cert manager")
 
-		certId := uploadCert(domain, cloud)
+		certId := uploadCert(domain, cloud, info)
 		applyCertToIngress(certId, domain, clientSet, info.Namespace, info.IngressName, info.SecretName, domain)
 	} else {
 		find := exec.Command("find", "/var/www/html/.well-known/acme-challenge/", "-maxdepth", "1", "-type", "f")
@@ -743,7 +754,7 @@ func createCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 
 		if matchAgain {
 			fmt.Println("Certificate creation successful")
-			certId := uploadCert(domain, cloud)
+			certId := uploadCert(domain, cloud, info)
 			applyCertToIngress(certId, domain, clientSet, info.Namespace, info.IngressName, info.SecretName, domain)
 		} else {
 			fmt.Println("Certificate creation failed")
@@ -768,7 +779,7 @@ func createWildCert(info Info, domain string, clientSet *kubernetes.Clientset, c
 
 	if match {
 		fmt.Println("Certificate created successfully\ncertificate upload to cert manager")
-		certId := uploadCert(domain, cloud)
+		certId := uploadCert(domain, cloud, info)
 		for _, ingress := range info.Ingresses {
 			applyCertToIngress(certId, domain, clientSet, ingress.Namespace, ingress.IngressName, "", checkDomain)
 		}

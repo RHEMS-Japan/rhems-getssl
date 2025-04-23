@@ -52,3 +52,4 @@ COPY ./account-key-base.yml /tmp/configmap/account-key-base.yml
 COPY ./acme-challenge-base.yml /tmp/configmap/acme-challenge-base.yml
 COPY ./file-name-base.yml /tmp/configmap/file-name-base.yml
 COPY ./secret-base.yml /tmp/configmap/secret-base.yml
+COPY ./cert-secret-base.yml /tmp/configmap/cert-secret-base.yml
