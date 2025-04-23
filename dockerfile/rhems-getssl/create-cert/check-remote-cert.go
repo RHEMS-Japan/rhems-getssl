@@ -15,6 +15,8 @@ import (
 	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common/errors"
 	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common/profile"
 	ssl "github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/ssl/v20191205"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"os"
 	"regexp"
 	"time"
@@ -137,6 +139,35 @@ func getCertAWS(arn string) (*acm.GetCertificateOutput, error) {
 	}
 
 	return output, nil
+}
+
+func getCertSecret(clientSet *kubernetes.Clientset, secretName string, namespace string, certFileName string) (string, error) {
+	secret, err := clientSet.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	if err != nil {
+		fmt.Println("Failed to get secret")
+		fmt.Println(err.Error())
+		return "", err
+	}
+
+	cert, ok := secret.Data[certFileName]
+	if !ok {
+		fmt.Println("Certificate not found in secret")
+		return "", fmt.Errorf("certificate not found in secret")
+	}
+
+	return string(cert), nil
+}
+
+func splitCert(cert string) ([]string, error) {
+	re := regexp.MustCompile(`(?s)-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----`)
+	matches := re.FindAllString(cert, -1)
+
+	if len(matches) == 0 {
+		fmt.Println("No certificates found")
+		return nil, fmt.Errorf("no certificates found")
+	}
+
+	return matches, nil
 }
 
 func readCert(cert string) (time.Time, error) {
