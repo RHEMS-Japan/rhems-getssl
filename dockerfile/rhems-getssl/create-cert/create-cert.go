@@ -45,6 +45,10 @@ type Info struct { // 証明書情報
 	Namespace      string    `yaml:"namespace"`
 	IngressName    string    `yaml:"ingress_name"`
 	SecretName     string    `yaml:"secret_name"`
+	CertFileName   string    `yaml:"cert_file_name"`
+	KeyFileName    string    `yaml:"key_file_name"`
+	CertSecretName string    `yaml:"cert_secret_name"`
+	KeySecretName  string    `yaml:"key_secret_name"`
 	Domains        []string  `yaml:"domains"`
 	WildcardDomain string    `yaml:"wildcard_domain"`
 	WildCardSans   []string  `yaml:"wildcard_sans"`
@@ -160,24 +164,35 @@ func main() {
 
 		if info.WildcardDomain != "" { // ワイルドカード証明書の場合
 			if force {
-				createWildCert(info, info.WildcardDomain, clientSet)
+				createWildCert(info, info.WildcardDomain, clientSet, info.CheckDomains[0])
 			} else {
 				var isNotExpire bool
 				var expireDate string
-				for _, checkDomain := range info.CheckDomains {
-					isNotExpire, expireDate = checkCertValidation(checkDomain)
+				if info.CertFileName != "" {
+					isNotExpire, expireDate = checkSecretCert(clientSet, info.CertSecretName, info.CertFileName, info.Namespace, info.WildcardDomain)
 					if isNotExpire {
 						continue
 					} else {
-						createWildCert(info, info.WildcardDomain, clientSet)
-						break
+						createWildCert(info, info.WildcardDomain, clientSet, info.CheckDomains[0])
+					}
+				} else {
+					for _, checkDomain := range info.CheckDomains {
+						isNotExpire, expireDate = checkCertValidation(checkDomain, info.WildcardDomain)
+						if isNotExpire {
+							continue
+						} else {
+							createWildCert(info, info.WildcardDomain, clientSet, checkDomain)
+							break
+						}
 					}
 				}
-				postToBadges(info.WildcardDomain, true, "Certificate is still valid", fmt.Sprintf("Expire Date: %s", expireDate), 0)
+				if isNotExpire {
+					postToBadges(info.WildcardDomain, true, "Certificate is still valid", fmt.Sprintf("Expire Date: %s", expireDate), 0)
+				}
 			}
 			if cloud == "aws" {
 				checkIngress(clientSet, info.Ingresses, info.WildcardDomain)
-			} else {
+			} else if cloud == "tencent" {
 				checkSecret(clientSet, info.Secrets, info.WildcardDomain)
 			}
 		} else { // 通常証明書の場合
@@ -185,7 +200,7 @@ func main() {
 				if force {
 					createCert(info, domain, clientSet)
 				} else {
-					isNotExpire, expireDate := checkCertValidation(domain)
+					isNotExpire, expireDate := checkCertValidation(domain, domain)
 					if isNotExpire {
 						postToBadges(domain, true, "Certificate is still valid", fmt.Sprintf("Expire Date: %s", expireDate), 0)
 						continue
@@ -320,7 +335,7 @@ func initKubeClient() *kubernetes.Clientset {
 }
 
 // 証明書アップロード処理
-func uploadCert(domain string, cloud string) string {
+func uploadCert(domain string, cloud string, info Info) string {
 	// getsslで作成された証明書ファイルのパス
 	certPath := fmt.Sprintf("/root/.getssl/%s/%s.crt", domain, domain)
 	fullCertChainPath := fmt.Sprintf("/root/.getssl/%s/%s_chain.pem", domain, domain)
@@ -361,13 +376,20 @@ func uploadCert(domain string, cloud string) string {
 		fmt.Println("Certificate ARN: ", *arn)
 
 		return *arn
-	} else {
+	} else if cloud == "tencent" {
 		response := uploadCertTencent(domain, fullCertChain, privateKey)
 
 		fmt.Println("Certificate uploaded successfully")
 		fmt.Println("Certificate response: ", response.ToJsonString())
 
 		return *response.Response.CertificateId
+	} else {
+		result := uploadCertSecret(domain, fullCertChain, privateKey, info.CertFileName, info.KeyFileName, info.CertSecretName, info.KeySecretName, info.Namespace)
+
+		fmt.Println("Certificate applied successfully")
+		fmt.Println("Certificate response: ", result)
+
+		return result
 	}
 }
 
@@ -420,6 +442,27 @@ func uploadCertTencent(domain string, certificate []byte, privateKey []byte) *ss
 	}
 
 	return response
+}
+
+func uploadCertSecret(domain string, certificate []byte, privateKey []byte, certificateFileName string, privateKeyFileName string, certificateSecretName string, privateKeySecretName string, namespace string) string {
+	exec.Command("cp", "cert-secret-base.yml", "cert-secret.yml").Run()
+
+	replaceStringInFile("cert-secret.yml", "__CERT_PEM_SECRET_NAME__", certificateSecretName)
+	replaceStringInFile("cert-secret.yml", "__CERT_PEM_NAME__", certificateFileName)
+	replaceStringInFile("cert-secret.yml", "__CERT_PEM__", b64.StdEncoding.EncodeToString(certificate))
+
+	replaceStringInFile("cert-secret.yml", "__CERT_KEY_SECRET_NAME__", privateKeySecretName)
+	replaceStringInFile("cert-secret.yml", "__CERT_KEY_NAME__", privateKeyFileName)
+	replaceStringInFile("cert-secret.yml", "__CERT_KEY__", b64.StdEncoding.EncodeToString(privateKey))
+
+	output, err := exec.Command("kubectl", "apply", "-f", "cert-secret.yml", "-n", namespace).CombinedOutput()
+	if err != nil {
+		fmt.Println(string(output))
+		postToBadges(domain, false, "cert-secret.yml apply error", string(output), 0)
+		os.Exit(1)
+	}
+
+	return string(output)
 }
 
 // TKE用証明書IDSecretの作成、更新
@@ -577,13 +620,32 @@ func postToBadges(app string, status bool, msg string, log string, count int) {
 }
 
 // 証明書の有効期限チェック
-func checkCertValidation(url string) (bool, string) {
+func checkCertValidation(url string, domain string) (bool, string) {
 	res, err := http.Get("https://" + url)
 
 	if err != nil {
 		fmt.Println("cert validation error: ", err)
-		postToBadges(url, false, "Cert validation error", err.Error(), 0)
+		postToBadges(domain, false, "Cert validation error", err.Error(), 0)
 		os.Exit(1)
+	}
+
+	defer res.Body.Close()
+
+	for i := 0; i < len(res.TLS.PeerCertificates); i++ {
+		certCN := res.TLS.PeerCertificates[i].Subject.CommonName
+		expireTime := res.TLS.PeerCertificates[i].NotAfter
+		expireJSTTime := expireTime.In(time.FixedZone("Asia/Tokyo", 9*60*60))
+		expireDate := fmt.Sprintf("%s UTC", expireTime.Format("2006-01-02 15:04:05"))
+		expireJSTDate := fmt.Sprintf("%s JST", expireJSTTime.Format("2006-01-02 15:04:05"))
+
+		fmt.Println("Domain: ", url)
+		fmt.Println("Cert CN: ", certCN)
+		fmt.Println("Expire Time: ", expireTime)
+		fmt.Println("Expire JST Time: ", expireJSTTime)
+		fmt.Println("Expire Date: ", expireDate)
+		fmt.Println("Expire JST Date: ", expireJSTDate)
+		fmt.Println("Update Before Day: ", updateBeforeDay)
+		fmt.Println("しきい値: ", expireTime.Add(-24*time.Duration(updateBeforeDay)*time.Hour))
 	}
 
 	expireTime := res.TLS.PeerCertificates[0].NotAfter
@@ -604,7 +666,7 @@ func checkCertValidation(url string) (bool, string) {
 		return true, expireJSTDate
 	} else {
 		fmt.Println("Certificate needs to be updated")
-		return false, ""
+		return false, expireJSTDate
 	}
 }
 
@@ -632,8 +694,8 @@ func createCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 	if match {
 		fmt.Println("Certificate created successfully\ncertificate upload to cert manager")
 
-		certId := uploadCert(domain, cloud)
-		applyCertToIngress(certId, domain, clientSet, info.Namespace, info.IngressName, info.SecretName)
+		certId := uploadCert(domain, cloud, info)
+		applyCertToIngress(certId, domain, clientSet, info.Namespace, info.IngressName, info.SecretName, domain)
 	} else {
 		find := exec.Command("find", "/var/www/html/.well-known/acme-challenge/", "-maxdepth", "1", "-type", "f")
 		findOut, _ := find.CombinedOutput()
@@ -701,8 +763,8 @@ func createCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 
 		if matchAgain {
 			fmt.Println("Certificate creation successful")
-			certId := uploadCert(domain, cloud)
-			applyCertToIngress(certId, domain, clientSet, info.Namespace, info.IngressName, info.SecretName)
+			certId := uploadCert(domain, cloud, info)
+			applyCertToIngress(certId, domain, clientSet, info.Namespace, info.IngressName, info.SecretName, domain)
 		} else {
 			fmt.Println("Certificate creation failed")
 			postToBadges(domain, false, "Certificate creation failed", getsslAgainOutput, 0)
@@ -712,7 +774,7 @@ func createCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 }
 
 // DNS認証によるwildcard証明書の作成と適用
-func createWildCert(info Info, domain string, clientSet *kubernetes.Clientset) {
+func createWildCert(info Info, domain string, clientSet *kubernetes.Clientset, checkDomain string) {
 	fmt.Println("Domain: ", domain)
 
 	getssl := exec.Command("./getssl", "-f", domain)
@@ -726,12 +788,12 @@ func createWildCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 
 	if match {
 		fmt.Println("Certificate created successfully\ncertificate upload to cert manager")
-		certId := uploadCert(domain, cloud)
+		certId := uploadCert(domain, cloud, info)
 		for _, ingress := range info.Ingresses {
-			applyCertToIngress(certId, domain, clientSet, ingress.Namespace, ingress.IngressName, "")
+			applyCertToIngress(certId, domain, clientSet, ingress.Namespace, ingress.IngressName, "", checkDomain)
 		}
 		for _, secret := range info.Secrets {
-			applyCertToIngress(certId, domain, clientSet, secret.Namespace, "", secret.SecretName)
+			applyCertToIngress(certId, domain, clientSet, secret.Namespace, "", secret.SecretName, checkDomain)
 		}
 	} else {
 		fmt.Println("Certificate creation failed")
@@ -741,16 +803,53 @@ func createWildCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 }
 
 // 証明書の適用
-func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clientset, namespace string, ingressName string, secretName string) {
+func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clientset, namespace string, ingressName string, secretName string, checkDomain string) {
 	if cloud == "aws" {
 		fmt.Println("Certificate ARN: ", certId)
 		editIngress(domain, clientSet, namespace, ingressName, certId)
-		postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
+		time.Sleep(10 * time.Second)
+		if force {
+			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
+		} else {
+			certCheck, expireDate := appliedCertCheck(checkDomain, checkDomain)
+			if !certCheck {
+				postToBadges(domain, true, "Certificate uploaded successfully", fmt.Sprintf("Certificate ARN: %s\n Please check manually. expireDate: %s", certId, expireDate), 0)
+			} else {
+				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ARN: "+certId, 0)
+			}
+		}
 	} else {
 		fmt.Println("Certificate ID: ", certId)
 		editCertSecret(domain, certId, secretName, namespace)
-		postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
+		time.Sleep(10 * time.Second)
+		if force {
+			postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
+		} else {
+			certCheck, expireDate := appliedCertCheck(checkDomain, checkDomain)
+			if !certCheck {
+				postToBadges(domain, true, "Certificate uploaded successfully", fmt.Sprintf("Certificate ID: %s\n Please check manually. expireDate: %s", certId, expireDate), 0)
+			} else {
+				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certId, 0)
+			}
+		}
 	}
+}
+
+func appliedCertCheck(checkDomain string, domain string) (bool, string) {
+	status := false
+	expireDate := ""
+	for i := 0; i < 10; i++ {
+		isNotExpireCheck, expireDateCheck := checkCertValidation(checkDomain, domain)
+		expireDate = expireDateCheck
+		if isNotExpireCheck {
+			status = true
+			break
+		} else {
+			fmt.Println("Certificate is not applied yet")
+			time.Sleep(10 * time.Second)
+		}
+	}
+	return status, expireDate
 }
 
 func checkSecret(clientSet *kubernetes.Clientset, secrets []Secret, domain string) {
@@ -796,7 +895,11 @@ func checkSecret(clientSet *kubernetes.Clientset, secrets []Secret, domain strin
 
 	for _, secret := range checkSecrets {
 		if secret.CertificateID != mostLongValidCertId {
-			editCertSecret(domain, mostLongValidCertId, secret.SecretName, secret.Namespace)
+			if mostLongValidCertId == "" {
+				fmt.Println("Certificate ID is empty")
+			} else {
+				editCertSecret(domain, mostLongValidCertId, secret.SecretName, secret.Namespace)
+			}
 		}
 	}
 }
@@ -847,7 +950,56 @@ func checkIngress(clientSet *kubernetes.Clientset, ingresses []Ingress, domain s
 
 	for _, ingress := range checkIngresses {
 		if ingress.CertificateARN != mostLongValidCertARN {
-			editIngress(domain, clientSet, ingress.Namespace, ingress.IngressName, mostLongValidCertARN)
+			if mostLongValidCertARN == "" {
+				fmt.Println("Certificate ARN is empty")
+			} else {
+				editIngress(domain, clientSet, ingress.Namespace, ingress.IngressName, mostLongValidCertARN)
+			}
 		}
 	}
+}
+
+func checkSecretCert(clientSet *kubernetes.Clientset, certSecretName string, certFileName string, namespace string, domain string) (bool, string) {
+	certPem, err := getCertSecret(clientSet, certSecretName, certFileName, namespace)
+	if err != nil {
+		fmt.Println(err.Error())
+		postToBadges(domain, false, "get cert from secret error", err.Error(), 0)
+		os.Exit(1)
+	}
+
+	certs, err := splitCert(certPem)
+	if err != nil {
+		fmt.Println(err.Error())
+		postToBadges(domain, false, "split cert error", err.Error(), 0)
+		os.Exit(1)
+	}
+
+	isCertValid := true
+	var certNotAfter time.Time
+	for _, cert := range certs {
+		notAfter, err := readCert(cert)
+		if err != nil {
+			fmt.Println(err.Error())
+			postToBadges(domain, false, "get cert error", err.Error(), 0)
+			os.Exit(1)
+		}
+
+		if isCertTimeValid(notAfter) {
+			fmt.Println("Certificate is still valid")
+		} else {
+			fmt.Println("Certificate needs to be updated")
+			isCertValid = false
+		}
+
+		if certNotAfter == (time.Time{}) {
+			certNotAfter = notAfter
+		} else if notAfter.After(certNotAfter) {
+			certNotAfter = notAfter
+		}
+	}
+
+	certNotAfterJST := certNotAfter.In(time.FixedZone("Asia/Tokyo", 9*60*60))
+	certNotAfterJSTDate := fmt.Sprintf("%s JST", certNotAfterJST.Format("2006-01-02 15:04:05"))
+
+	return isCertValid, certNotAfterJSTDate
 }

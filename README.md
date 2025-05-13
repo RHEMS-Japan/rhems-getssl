@@ -1,8 +1,6 @@
 # rhems-getssl
 
-![docker-hub](https://img.shields.io/docker/automated/rhemsjapan/rhems-getssl)
-
-Let's Encryptより証明書を取得し各種クラウドKubernetes環境にて証明書の更新を自動で行うシステムです。
+[srvrco/getssl](https://github.com/srvrco/getssl?tab=readme-ov-file)スクリプトを使用し各種クラウドKubernetes環境にてLet's Encrypt発行の無料証明書の取得・管理・更新を自動で行うシステムです。
 HTTP-01 チャレンジとDNS-01 チャレンジの両方に対応しています。
 また、DNS-01 チャレンジの場合は現在のところAWS Route53のみ対応しています。
 
@@ -22,7 +20,7 @@ HTTP-01 チャレンジ(HTTPアクセスによるトークン認証)を使用す
 
 ### 1. 準備
 
-http-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgeの各種変数を設定してください。
+http-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgesの各種変数を設定してください。
 ```yaml
 # 一部抜粋
 spec:
@@ -286,7 +284,7 @@ rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
 ## 使用方法 DNS-01 チャレンジの場合
 
 DNS-01 チャレンジ(DNSのTXTレコードによる認証)を使用する場合は以下の手順に従ってください。
-また、Wildcard証明書の取得が可能です。
+また、Wildcard証明書の取得が可能です。 Wildcard証明書を取得、更新するモードでは証明書の同期も行われます。
 なお、制約として下記にご注意ください。
 - 今のところDNSサービスはAWS Route53のみ対応しています。
 
@@ -321,7 +319,7 @@ spec:
                     fieldRef:
                       fieldPath: metadata.namespace
                 - name: API_TOKEN
-                  value: __BADGE_API_TOKEN__ # rhems-badgeのAPIトークン
+                  value: __BADGE_API_TOKEN__ # rhems-badgesのAPIトークン
                 - name: ORGANIZATION
                   value: __ORGANIZATION__ # organization名
                 - name: REPO
@@ -358,7 +356,7 @@ spec:
                     fieldRef:
                       fieldPath: metadata.namespace
                 - name: API_TOKEN
-                  value: __BADGE_API_TOKEN__ # rhems-badgeのAPIトークン
+                  value: __BADGE_API_TOKEN__ # rhems-badgesのAPIトークン
                 - name: ORGANIZATION
                   value: __ORGANIZATION__ # organization名
                 - name: REPO
@@ -506,6 +504,15 @@ rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
 まだ対象ドメインに対しhttps接続が行えない場合、cronjob.ymlにて`-force=true`オプションを追加し実行してください。
 もしオプションが無い場合はエラーとなります。
 
+## Wildcard証明書環境での証明書の同期機能について
+
+config.ymlより複数のIngress、Secretsに対しWildcard証明書を適用する設定では証明書有効期限チェックのあと証明書の同期が行われます。
+同期される証明書の選択条件は下記の通りです。
+
+* クラウドーサービスより取得が可能なこと
+* 有効期限が切れていないこと
+* すでに使用されている証明書の中で最も有効期限が長いもの
+
 ## その他
 
 ### http -> httpsリダイレクトが設定されている場合
@@ -514,3 +521,7 @@ rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
 
 `私たちの HTTP-01 チャレンジの実装は、リダイレクトを最大 10 回まで追跡します。 追跡されるのは、“http:” から “https:” へのリダイレクトで、80 番ポートから 443 番ポートへのリダイレクトのみです。 IP アドレスへのリダイレクトは許可されません。 HTTPS URL へのリダイレクトである場合、証明書の検証は行いません (というのも、このチャレンジは、有効な証明書のブートストラップを意図したものであり、HTTPS URL へのリダイレクトの場合、途中で自己署名証明書や有効期限切れの証明書が存在する可能性があるためです)。`
 https://letsencrypt.org/ja/docs/challenge-types/
+
+## フロー図
+
+![rhems-getssl-flow](public/img/rhems-getssl-flow-resize.png)

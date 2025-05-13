@@ -14,5 +14,5 @@ roleRef:
 subjects:
   - name: getssl-job
     kind: ServiceAccount
-    namespace: yutaro-test
+    namespace: rhems-getssl
 

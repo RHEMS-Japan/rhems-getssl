@@ -12,6 +12,7 @@ mv /tmp/configmap/account-key-base.yml /root/account-key-base.yml
 mv /tmp/configmap/acme-challenge-base.yml /root/acme-challenge-base.yml
 mv /tmp/configmap/file-name-base.yml /root/file-name-base.yml
 mv /tmp/configmap/secret-base.yml /root/secret-base.yml
+mv /tmp/configmap/cert-secret-base.yml /root/cert-secret-base.yml
 ./getssl -c "${_domain}"
 sed -i 's/SANS=/#SANS=/g' /root/.getssl/"${_domain}"/getssl.cfg
 echo "ACL=('/var/www/html/.well-known/acme-challenge')" >> /root/.getssl/"${_domain}"/getssl.cfg
