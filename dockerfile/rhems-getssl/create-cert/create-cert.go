@@ -802,11 +802,7 @@ func createCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 		if matchAgain {
 			fmt.Println("Certificate creation successful")
 			certId := uploadCert(domain, cloud, info)
-			if info.Namespace == "" && info.IngressName == "" && info.SecretName == "" && cloud == "tencent" {
-				editCLBListeners(domain, info.CLB.LoadBalancerId, info.CLB.ListenerIds, certId)
-			} else {
-				applyCertToIngress(certId, domain, clientSet, info.Namespace, info.IngressName, info.SecretName, domain)
-			}
+			applyCertToIngress(certId, domain, clientSet, info.Namespace, info.IngressName, info.SecretName, domain)
 		} else {
 			fmt.Println("Certificate creation failed")
 			postToBadges(domain, false, "Certificate creation failed", getsslAgainOutput, 0)
