@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	clb "github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/clb/v20180317"
 	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common"
 	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common/errors"
 	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common/profile"
@@ -41,10 +42,16 @@ type Ingress struct { // EKS用Ingress 設定
 	IngressName string `yaml:"ingress_name"`
 }
 
+type CLB struct {
+	LoadBalancerId string   `yaml:"load_balancer_id"`
+	ListenerIds    []string `yaml:"listener_id"`
+}
+
 type Info struct { // 証明書情報
 	Namespace      string    `yaml:"namespace"`
 	IngressName    string    `yaml:"ingress_name"`
 	SecretName     string    `yaml:"secret_name"`
+	CLB            CLB       `yaml:"clb"`
 	CertFileName   string    `yaml:"cert_file_name"`
 	KeyFileName    string    `yaml:"key_file_name"`
 	CertSecretName string    `yaml:"cert_secret_name"`
@@ -55,6 +62,7 @@ type Info struct { // 証明書情報
 	CheckDomains   []string  `yaml:"check_domains"`
 	Ingresses      []Ingress `yaml:"ingresses"`
 	Secrets        []Secret  `yaml:"secrets"`
+	CLBs           []CLB     `yaml:"clbs"`
 }
 
 type Config struct { // yamlファイルの構造
@@ -444,6 +452,7 @@ func uploadCertTencent(domain string, certificate []byte, privateKey []byte) *ss
 	return response
 }
 
+// KubernetesのSecretに証明書をアップロード
 func uploadCertSecret(domain string, certificate []byte, privateKey []byte, certificateFileName string, privateKeyFileName string, certificateSecretName string, privateKeySecretName string, namespace string) string {
 	exec.Command("cp", "cert-secret-base.yml", "cert-secret.yml").Run()
 
@@ -496,6 +505,35 @@ func editIngress(domain string, clientSet *kubernetes.Clientset, namespace strin
 		os.Exit(1)
 	} else {
 		fmt.Printf("Ingress %s updated successfully\n", ingressName)
+	}
+}
+
+// Tencent CLB Listener用証明書IDの適用
+func editCLBListeners(domain string, loadBalancerId string, listenerIds []string, certificateId string) {
+	credential := common.NewCredential(os.Getenv("TENCENTCLOUD_SECRET_ID"), os.Getenv("TENCENTCLOUD_SECRET_KEY"))
+
+	cpf := profile.NewClientProfile()
+	cpf.HttpProfile.Endpoint = "clb.intl.tencentcloudapi.com"
+	client, _ := clb.NewClient(credential, "ap-tokyo", cpf)
+
+	for _, listenerId := range listenerIds {
+		request := clb.NewModifyListenerRequest()
+
+		request.LoadBalancerId = &loadBalancerId
+		request.ListenerId = &listenerId
+		request.Certificate = &clb.CertificateInput{
+			SSLMode: common.StringPtr("UNIDIRECTIONAL"),
+			CertId:  &certificateId,
+		}
+
+		response, err := client.ModifyListener(request)
+		if err != nil {
+			fmt.Printf("An API error has returned: %s", err)
+			postToBadges(domain, false, "edit CLB listener Error", err.Error(), 0)
+			os.Exit(1)
+		}
+
+		fmt.Printf("%s", response.ToJsonString())
 	}
 }
 
@@ -764,7 +802,11 @@ func createCert(info Info, domain string, clientSet *kubernetes.Clientset) {
 		if matchAgain {
 			fmt.Println("Certificate creation successful")
 			certId := uploadCert(domain, cloud, info)
-			applyCertToIngress(certId, domain, clientSet, info.Namespace, info.IngressName, info.SecretName, domain)
+			if info.Namespace == "" && info.IngressName == "" && info.SecretName == "" && cloud == "tencent" {
+				editCLBListeners(domain, info.CLB.LoadBalancerId, info.CLB.ListenerIds, certId)
+			} else {
+				applyCertToIngress(certId, domain, clientSet, info.Namespace, info.IngressName, info.SecretName, domain)
+			}
 		} else {
 			fmt.Println("Certificate creation failed")
 			postToBadges(domain, false, "Certificate creation failed", getsslAgainOutput, 0)
@@ -794,6 +836,9 @@ func createWildCert(info Info, domain string, clientSet *kubernetes.Clientset, c
 		}
 		for _, secret := range info.Secrets {
 			applyCertToIngress(certId, domain, clientSet, secret.Namespace, "", secret.SecretName, checkDomain)
+		}
+		for _, clbInfo := range info.CLBs {
+			editCLBListeners(domain, clbInfo.LoadBalancerId, clbInfo.ListenerIds, certId)
 		}
 	} else {
 		fmt.Println("Certificate creation failed")
