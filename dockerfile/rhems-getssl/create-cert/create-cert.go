@@ -553,6 +553,17 @@ func editCLBListeners(domain string, loadBalancerId string, listenerIds []string
 					os.Exit(1)
 				}
 			}
+
+			if force {
+				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certificateId, 0)
+			} else {
+				certCheck, expireDate := appliedCertCheck(ruleDomain, domain)
+				if !certCheck {
+					postToBadges(domain, true, "Certificate uploaded successfully", fmt.Sprintf("Certificate ID: %s\n Please check manually. expireDate: %s", certificateId, expireDate), 0)
+				} else {
+					postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certificateId, 0)
+				}
+			}
 		}
 	}
 }
