@@ -137,6 +137,7 @@ info:
 ```
 
 http-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
+
 ```yaml
 apiVersion: v1
 kind: Secret
@@ -144,10 +145,10 @@ metadata:
   name: env
 type: Opaque
 stringData:
-  AWS_ACCESS_KEY_ID: __AWS_ACCESS_KEY_ID__ # AWSのアクセスキー
-  AWS_SECRET_ACCESS_KEY: __AWS_SECRET_ACCESS_KEY__ # AWSのシークレットキー
-  AWS_DEFAULT_REGION: __AWS_DEFAULT_REGION__ # AWSのリージョン
-  AWS_DEFAULT_OUTPUT: json # AWSの出力形式
+  AWS_ACCESS_KEY_ID: "__AWS_ACCESS_KEY_ID__" # AWSのアクセスキー
+  AWS_SECRET_ACCESS_KEY: "__AWS_SECRET_ACCESS_KEY__" # AWSのシークレットキー
+  AWS_DEFAULT_REGION: "__AWS_DEFAULT_REGION__" # AWSのリージョン
+  AWS_DEFAULT_OUTPUT: "json" # AWSの出力形式
 ---
 # tencentcloudの場合
 apiVersion: v1
@@ -156,9 +157,9 @@ metadata:
   name: env
 type: Opaque
 stringData:
-  TENCENTCLOUD_SECRET_ID: __TENCENTCLOUD_SECRET_ID__
-  TENCENTCLOUD_SECRET_KEY: __TENCETCLOUD_SECRET_KEY__
-  TENCENTCLOUD_REGION: __TENCENTCLOUD_REGION__
+  TENCENTCLOUD_SECRET_ID: "__TENCENTCLOUD_SECRET_ID__"
+  TENCENTCLOUD_SECRET_KEY: "__TENCETCLOUD_SECRET_KEY__"
+  TENCENTCLOUD_REGION: "__TENCENTCLOUD_REGION__"
 ```
 
 http-kubernetes/rbac.ymlにて各種権限を設定してください。
@@ -393,6 +394,11 @@ info:
         secret_name: rhems-getssl-cert-2
       - namespace: application-3
         secret_name: rhems-getssl-cert-3
+    clbs:
+      - load_balancer_id: lb-12345678
+        listener_ids:
+          - "lbl-12345678"
+        region: ap-tokyo
 ---
 # awsの場合
 info:
@@ -414,19 +420,8 @@ info:
 
 dns-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
 Tencentの場合でもRoute53にドメインを登録するためにAWSのKey/Secが必要です。
+
 ```yaml
-# awsの場合
-apiVersion: v1
-kind: Secret
-metadata:
-  name: env
-type: Opaque
-stringData:
-  AWS_ACCESS_KEY_ID: __AWS_ACCESS_KEY_ID__ # AWSのアクセスキー
-  AWS_SECRET_ACCESS_KEY: __AWS_SECRET_ACCESS_KEY__ # AWSのシークレットキー
-  AWS_DEFAULT_REGION: __AWS_DEFAULT_REGION__ # AWSのリージョン
-  AWS_DEFAULT_OUTPUT: json # AWSの出力形式
----
 # tencentの場合
 apiVersion: v1
 kind: Secret
@@ -434,13 +429,25 @@ metadata:
   name: env
 type: Opaque
 stringData:
-  AWS_ACCESS_KEY_ID: __AWS_ACCESS_KEY_ID__ # AWSのアクセスキー
-  AWS_SECRET_ACCESS_KEY: __AWS_SECRET_ACCESS_KEY__ # AWSのシークレットキー
-  AWS_DEFAULT_REGION: __AWS_DEFAULT_REGION__ # AWSのリージョン
-  AWS_DEFAULT_OUTPUT: json # AWSの出力形式
-  TENCENTCLOUD_SECRET_ID: __TENCENTCLOUD_SECRET_ID__
-  TENCENTCLOUD_SECRET_KEY: __TENCETCLOUD_SECRET_KEY__
-  TENCENTCLOUD_REGION: __TENCENTCLOUD_REGION__
+  AWS_ACCESS_KEY_ID: "__AWS_ACCESS_KEY_ID__" # AWSのアクセスキー
+  AWS_SECRET_ACCESS_KEY: "__AWS_SECRET_ACCESS_KEY__" # AWSのシークレットキー
+  AWS_DEFAULT_REGION: "__AWS_DEFAULT_REGION__" # AWSのリージョン
+  AWS_DEFAULT_OUTPUT: "json" # AWSの出力形式
+  TENCENTCLOUD_SECRET_ID: "__TENCENTCLOUD_SECRET_ID__"
+  TENCENTCLOUD_SECRET_KEY: "__TENCETCLOUD_SECRET_KEY__"
+  TENCENTCLOUD_REGION: "__TENCENTCLOUD_REGION__"
+---
+# awsの場合
+apiVersion: v1
+kind: Secret
+metadata:
+  name: env
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: "__AWS_ACCESS_KEY_ID__" # AWSのアクセスキー
+  AWS_SECRET_ACCESS_KEY: "__AWS_SECRET_ACCESS_KEY__" # AWSのシークレットキー
+  AWS_DEFAULT_REGION: "__AWS_DEFAULT_REGION__" # AWSのリージョン
+  AWS_DEFAULT_OUTPUT: "json" # AWSの出力形式
 ```
 
 dns-kubernetes/rbac.ymlにて各種権限を設定してください。
