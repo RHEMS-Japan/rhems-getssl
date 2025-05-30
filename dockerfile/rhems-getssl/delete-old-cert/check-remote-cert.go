@@ -161,12 +161,12 @@ func checkTencentCert(certIds []string, domains []string) {
 
 		if isCertTimeInvalid(notAfter) {
 			fmt.Println("Certificate is invalid")
-			//response, err := deleteTencentCert(certId)
-			//if err != nil {
-			//	fmt.Println(err.Error())
-			//	os.Exit(1)
-			//}
-			//fmt.Println(response)
+			response, err := deleteTencentCert(certId)
+			if err != nil {
+				fmt.Println(err.Error())
+				os.Exit(1)
+			}
+			fmt.Println(response)
 		} else {
 			fmt.Println("Certificate is valid")
 		}
@@ -218,12 +218,12 @@ func checkAWSCert(certARNs []string, domains []string) {
 
 		if isCertTimeInvalid(notAfter) {
 			fmt.Println("Certificate is invalid")
-			//response, err := deleteAWSCert(certARN)
-			//if err != nil {
-			//	fmt.Println(err.Error())
-			//	os.Exit(1)
-			//}
-			//fmt.Println(response)
+			response, err := deleteAWSCert(certARN)
+			if err != nil {
+				fmt.Println(err.Error())
+				os.Exit(1)
+			}
+			fmt.Println(response)
 		} else {
 			fmt.Println("Certificate is valid")
 		}

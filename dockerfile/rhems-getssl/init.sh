@@ -8,6 +8,7 @@ mv /tmp/getssl/getssl /root/getssl
 mv /tmp/create-cert /root/create-cert
 cp /tmp/dns_edit_route53 /root/dns_add_route53
 cp /tmp/dns_edit_route53 /root/dns_remove_route53
+cp /tmp/delete-old-cert /root/delete-old-cert
 mv /tmp/configmap/account-key-base.yml /root/account-key-base.yml
 mv /tmp/configmap/acme-challenge-base.yml /root/acme-challenge-base.yml
 mv /tmp/configmap/file-name-base.yml /root/file-name-base.yml
