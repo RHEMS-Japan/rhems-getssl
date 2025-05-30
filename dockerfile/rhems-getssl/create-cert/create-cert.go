@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	clb "github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/clb/v20180317"
 	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common"
 	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common/errors"
 	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common/profile"
@@ -41,6 +42,12 @@ type Ingress struct { // EKS用Ingress 設定
 	IngressName string `yaml:"ingress_name"`
 }
 
+type CLB struct {
+	LoadBalancerId string   `yaml:"load_balancer_id"`
+	ListenerIds    []string `yaml:"listener_ids"`
+	Region         string   `yaml:"region"`
+}
+
 type Info struct { // 証明書情報
 	Namespace      string    `yaml:"namespace"`
 	IngressName    string    `yaml:"ingress_name"`
@@ -55,6 +62,7 @@ type Info struct { // 証明書情報
 	CheckDomains   []string  `yaml:"check_domains"`
 	Ingresses      []Ingress `yaml:"ingresses"`
 	Secrets        []Secret  `yaml:"secrets"`
+	CLBs           []CLB     `yaml:"clbs"`
 }
 
 type Config struct { // yamlファイルの構造
@@ -436,7 +444,7 @@ func uploadCertTencent(domain string, certificate []byte, privateKey []byte) *ss
 
 	response, err := client.UploadCertificate(request)
 	if _, ok := err.(*errors.TencentCloudSDKError); ok {
-		fmt.Printf("An API error has returned: %s", err)
+		fmt.Printf("An API error has returned: %s\n", err)
 		postToBadges(domain, false, "tencent api error", fmt.Sprintf("An API error has returned: %s", err), 0)
 		os.Exit(1)
 	}
@@ -444,6 +452,7 @@ func uploadCertTencent(domain string, certificate []byte, privateKey []byte) *ss
 	return response
 }
 
+// KubernetesのSecretに証明書をアップロード
 func uploadCertSecret(domain string, certificate []byte, privateKey []byte, certificateFileName string, privateKeyFileName string, certificateSecretName string, privateKeySecretName string, namespace string) string {
 	exec.Command("cp", "cert-secret-base.yml", "cert-secret.yml").Run()
 
@@ -497,6 +506,121 @@ func editIngress(domain string, clientSet *kubernetes.Clientset, namespace strin
 	} else {
 		fmt.Printf("Ingress %s updated successfully\n", ingressName)
 	}
+}
+
+// Tencent CLB Listener用証明書IDの適用
+func editCLBListeners(domain string, loadBalancerId string, listenerIds []string, listenerDomains map[string][]string, region string, certificateId string) {
+	credential := common.NewCredential(os.Getenv("TENCENTCLOUD_SECRET_ID"), os.Getenv("TENCENTCLOUD_SECRET_KEY"))
+
+	cpf := profile.NewClientProfile()
+	cpf.HttpProfile.Endpoint = "clb.intl.tencentcloudapi.com"
+	client, _ := clb.NewClient(credential, region, cpf)
+
+	for _, listenerId := range listenerIds {
+		ruleDomains := listenerDomains[listenerId]
+		for _, ruleDomain := range ruleDomains {
+			fmt.Printf("Updating listener %s %s\n", listenerId, ruleDomain)
+			request := clb.NewModifyDomainAttributesRequest()
+
+			request.LoadBalancerId = &loadBalancerId
+			request.ListenerId = &listenerId
+			request.Domain = &ruleDomain
+			request.Certificate = &clb.CertificateInput{
+				SSLMode: common.StringPtr("UNIDIRECTIONAL"),
+				CertId:  &certificateId,
+			}
+
+			response, err := client.ModifyDomainAttributes(request)
+			if err != nil {
+				fmt.Printf("An API error has returned: %s\n", err)
+				postToBadges(domain, false, "edit CLB listener Error", err.Error(), 0)
+				os.Exit(1)
+			}
+
+			fmt.Printf("%s\n", response.ToJsonString())
+
+			for {
+				status := getCLBRuleTaskStatus(domain, *response.Response.RequestId, region)
+				if status == 0 {
+					fmt.Printf("Listener %s %s updated successfully\n", listenerId, ruleDomain)
+					break
+				} else if status == 2 {
+					fmt.Printf("Listener %s %s is in progress\n", listenerId, ruleDomain)
+					time.Sleep(3 * time.Second)
+				} else {
+					fmt.Printf("Listener %s %s update failed\n", listenerId, ruleDomain)
+					postToBadges(domain, false, "edit CLB listener Error", fmt.Sprintf("Listener %s %s update failed", listenerId, ruleDomain), 0)
+					os.Exit(1)
+				}
+			}
+
+			if force {
+				postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certificateId, 0)
+			} else {
+				certCheck, expireDate := appliedCertCheck(ruleDomain, domain)
+				if !certCheck {
+					postToBadges(domain, true, "Certificate uploaded successfully", fmt.Sprintf("Certificate ID: %s\n Please check manually. expireDate: %s", certificateId, expireDate), 0)
+				} else {
+					postToBadges(domain, true, "Certificate uploaded successfully", "Certificate ID: "+certificateId, 0)
+				}
+			}
+		}
+	}
+}
+
+// Tencent CLB Listenerのドメイン取得
+func getCLBRuleDomains(domain string, loadBalancerId string, listenerIds []string, region string) map[string][]string {
+	credential := common.NewCredential(os.Getenv("TENCENTCLOUD_SECRET_ID"), os.Getenv("TENCENTCLOUD_SECRET_KEY"))
+
+	cpf := profile.NewClientProfile()
+	cpf.HttpProfile.Endpoint = "clb.intl.tencentcloudapi.com"
+	client, _ := clb.NewClient(credential, region, cpf)
+
+	listenerDomains := make(map[string][]string)
+
+	for _, listenerId := range listenerIds {
+		request := clb.NewDescribeListenersRequest()
+
+		request.LoadBalancerId = &loadBalancerId
+		request.ListenerIds = []*string{&listenerId}
+		response, err := client.DescribeListeners(request)
+		if err != nil {
+			fmt.Printf("An API error has returned: %s\n", err)
+			postToBadges(domain, false, "Describe CLB listener Error", err.Error(), 0)
+			os.Exit(1)
+		}
+		// A string return packet in JSON format is output
+		fmt.Printf("%s\n", response.ToJsonString())
+
+		var ruleDomains []string
+		for _, rule := range response.Response.Listeners[0].Rules {
+			ruleDomains = append(ruleDomains, *rule.Domain)
+		}
+
+		listenerDomains[listenerId] = ruleDomains
+	}
+
+	return listenerDomains
+}
+
+func getCLBRuleTaskStatus(domain string, requestId string, region string) int64 {
+	credential := common.NewCredential(os.Getenv("TENCENTCLOUD_SECRET_ID"), os.Getenv("TENCENTCLOUD_SECRET_KEY"))
+
+	cpf := profile.NewClientProfile()
+	cpf.HttpProfile.Endpoint = "clb.intl.tencentcloudapi.com"
+	client, _ := clb.NewClient(credential, region, cpf)
+
+	request := clb.NewDescribeTaskStatusRequest()
+
+	request.TaskId = &requestId
+	response, err := client.DescribeTaskStatus(request)
+	if err != nil {
+		fmt.Printf("An API error has returned: %s\n", err)
+		postToBadges(domain, false, "Describe CLB Rule Task Error", err.Error(), 0)
+		os.Exit(1)
+	}
+
+	return *response.Response.Status
 }
 
 // Deploymentのレプリカ数変更
@@ -788,12 +912,19 @@ func createWildCert(info Info, domain string, clientSet *kubernetes.Clientset, c
 
 	if match {
 		fmt.Println("Certificate created successfully\ncertificate upload to cert manager")
+		fmt.Println("Ingresses: ", info.Ingresses)
+		fmt.Println("Secrets: ", info.Secrets)
+		fmt.Println("CLBs: ", info.CLBs)
 		certId := uploadCert(domain, cloud, info)
 		for _, ingress := range info.Ingresses {
 			applyCertToIngress(certId, domain, clientSet, ingress.Namespace, ingress.IngressName, "", checkDomain)
 		}
 		for _, secret := range info.Secrets {
 			applyCertToIngress(certId, domain, clientSet, secret.Namespace, "", secret.SecretName, checkDomain)
+		}
+		for _, clbInfo := range info.CLBs {
+			listenerDomains := getCLBRuleDomains(domain, clbInfo.LoadBalancerId, clbInfo.ListenerIds, clbInfo.Region)
+			editCLBListeners(domain, clbInfo.LoadBalancerId, clbInfo.ListenerIds, listenerDomains, clbInfo.Region, certId)
 		}
 	} else {
 		fmt.Println("Certificate creation failed")
