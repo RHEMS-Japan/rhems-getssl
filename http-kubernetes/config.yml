@@ -1,13 +1,13 @@
 info:
   - namespace: application-1
-    secret_name: tencent-cert
+    secret_name: rhems-getssl-cert
     domains:
-      - test-getssl.example.com
+      - rhems-getssl.example.com
   - namespace: application-2
-    secret_name: tencent-cert-2
+    secret_name: rhems-getssl-2-cert
     domains:
-      - test-getssl-2.example.com
+      - rhems-getssl-2.example.com
   - namespace: application-3
-    secret_name: tencent-cert-3
+    secret_name: rhems-getssl-3-cert
     domains:
-      - test-getssl-3.example.com
+      - rhems-getssl-3.example.com
