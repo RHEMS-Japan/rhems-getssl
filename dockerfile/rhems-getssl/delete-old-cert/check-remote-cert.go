@@ -114,12 +114,12 @@ func getTencentCertIds() (*[]*ssl.Certificates, error) {
 	return &certificates, nil
 }
 
-func checkTencentCert(certIds []string, domains []string) {
+func checkTencentCert(certIds []string, domains []string) error {
 	for _, certId := range certIds {
 		cert, err := getCertTencent(certId)
 		if err != nil {
 			fmt.Println(err.Error())
-			os.Exit(1)
+			return err
 		} else if cert == nil {
 			continue
 		}
@@ -127,7 +127,7 @@ func checkTencentCert(certIds []string, domains []string) {
 		notAfter, sans, err := readCert(cert.Response.Content)
 		if err != nil {
 			fmt.Println(err.Error())
-			os.Exit(1)
+			return err
 		}
 
 		isMatch := false
@@ -164,27 +164,29 @@ func checkTencentCert(certIds []string, domains []string) {
 			response, err := deleteTencentCert(certId)
 			if err != nil {
 				fmt.Println(err.Error())
-				os.Exit(1)
+				return err
 			}
 			fmt.Println(response)
 		} else {
 			fmt.Println("Certificate is valid")
 		}
 	}
+
+	return nil
 }
 
-func checkAWSCert(certARNs []string, domains []string) {
+func checkAWSCert(certARNs []string, domains []string) error {
 	for _, certARN := range certARNs {
 		cert, err := getCertAWS(certARN)
 		if err != nil {
 			fmt.Println(err.Error())
-			os.Exit(1)
+			return err
 		}
 
 		notAfter, sans, err := readCert(*cert.Certificate)
 		if err != nil {
 			fmt.Println(err.Error())
-			os.Exit(1)
+			return err
 		}
 
 		isMatch := false
@@ -221,13 +223,15 @@ func checkAWSCert(certARNs []string, domains []string) {
 			response, err := deleteAWSCert(certARN)
 			if err != nil {
 				fmt.Println(err.Error())
-				os.Exit(1)
+				return err
 			}
 			fmt.Println(response)
 		} else {
 			fmt.Println("Certificate is valid")
 		}
 	}
+
+	return nil
 }
 
 func deleteTencentCert(certId string) (*ssl.DeleteCertificateResponse, error) {

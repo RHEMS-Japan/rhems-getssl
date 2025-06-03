@@ -1,36 +1,37 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"gopkg.in/yaml.v2"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
+	"net/http"
 	"os"
-	"path/filepath"
+	"strconv"
+	"time"
 )
 
-type Secret struct { // TKE用Secret 設定
-	Namespace  string `yaml:"namespace"`
-	SecretName string `yaml:"secret_name"`
-}
-
-type Ingress struct { // EKS用Ingress 設定
-	Namespace   string `yaml:"namespace"`
-	IngressName string `yaml:"ingress_name"`
-}
-
 type Info struct { // 証明書情報
-	Namespace      string    `yaml:"namespace"`
-	IngressName    string    `yaml:"ingress_name"`
-	SecretName     string    `yaml:"secret_name"`
-	Domains        []string  `yaml:"domains"`
-	WildcardDomain string    `yaml:"wildcard_domain"`
-	WildCardSans   []string  `yaml:"wildcard_sans"`
-	CheckDomains   []string  `yaml:"check_domains"`
-	Ingresses      []Ingress `yaml:"ingresses"`
-	Secrets        []Secret  `yaml:"secrets"`
+	Domains        []string `yaml:"domains"`
+	WildcardDomain string   `yaml:"wildcard_domain"`
+	WildCardSans   []string `yaml:"wildcard_sans"`
+}
+
+type Badges struct { // RHEMS Badges API 用
+	ApiToken     string `json:"api_token"`
+	Organization string `json:"organization"`
+	Repo         string `json:"repo"`
+	App          string `json:"app"`
+	Branch       string `json:"branch"`
+	Status       bool   `json:"status"`
+	Update       string `json:"update"`
+	Cronjob      string `json:"cronjob"`
+	GraceTime    int    `json:"grace_time"`
+	SlackFailed  string `json:"slack_failed"`
+	SlackSuccess string `json:"slack_success"`
+	Msg          string `json:"msg"`
+	Log          string `json:"log"`
 }
 
 type Config struct { // yamlファイルの構造
@@ -49,6 +50,7 @@ func main() {
 	// -f flagの値チェック
 	if yamlFile == "" {
 		fmt.Println("Please provide the path to the YAML file using -f flag.")
+		postToBadges(false, "Config not found error", "Please provide the path to the YAML file using -f flag.", 0)
 		os.Exit(1)
 	}
 
@@ -56,6 +58,7 @@ func main() {
 	yamlData, err := os.ReadFile(yamlFile)
 	if err != nil {
 		fmt.Println(err.Error())
+		postToBadges(false, "Config read error", err.Error(), 0)
 		os.Exit(1)
 	}
 
@@ -63,6 +66,7 @@ func main() {
 	var config Config
 	if err := yaml.Unmarshal(yamlData, &config); err != nil {
 		fmt.Println(err.Error())
+		postToBadges(false, "Config parse error", err.Error(), 0)
 		os.Exit(1)
 	}
 
@@ -70,6 +74,7 @@ func main() {
 		certs, err := getAWSCertARNs()
 		if err != nil {
 			fmt.Println(err.Error())
+			postToBadges(false, "Get aws cert ARNs failed", err.Error(), 0)
 			os.Exit(1)
 		}
 		for _, info := range config.Info {
@@ -79,13 +84,19 @@ func main() {
 				certArns = append(certArns, *cert.CertificateArn)
 			}
 			domains := append(info.WildCardSans, info.WildcardDomain)
-			checkAWSCert(certArns, domains)
+			domains = append(domains, info.Domains...)
+			err = checkAWSCert(certArns, domains)
+			if err != nil {
+				postToBadges(false, "Delete old certs failed", err.Error(), 0)
+				os.Exit(1)
+			}
 		}
 
 	} else {
 		certs, err := getTencentCertIds()
 		if err != nil {
 			fmt.Println(err.Error())
+			postToBadges(false, "Get tencent cert ids failed", err.Error(), 0)
 			os.Exit(1)
 		}
 		for _, info := range config.Info {
@@ -95,43 +106,60 @@ func main() {
 				certIds = append(certIds, *cert.CertificateId)
 			}
 			domains := append(info.WildCardSans, info.WildcardDomain)
-			checkTencentCert(certIds, domains)
+			domains = append(domains, info.Domains...)
+			err = checkTencentCert(certIds, domains)
+			if err != nil {
+				postToBadges(false, "Delete old certs failed", err.Error(), 0)
+				os.Exit(1)
+			}
 		}
 	}
+
+	postToBadges(true, "Delete old certs completed", "All old certificates have been deleted successfully.", 0)
 }
 
-// Kubernetes Clientの初期化
-func initKubeClient() *kubernetes.Clientset {
-	var kubeconfig *string
-	var config *rest.Config
-	var err error
+// Badges API への通知
+func postToBadges(status bool, msg string, log string, count int) {
+	graceTime, err := strconv.Atoi(os.Getenv("GRACE_TIME"))
+	if err != nil {
+		graceTime = 3
+	}
+	date := time.Now().Format("2006-01-02-15-04-05")
 
-	home := os.Getenv("HOME")
-	if home != "" {
-		kubeconfigPath := filepath.Join(home, ".kube", "config")
-		if _, err := os.Stat(kubeconfigPath); err == nil {
-			kubeconfig = flag.String("k", kubeconfigPath, "absolute path to the kubeconfig file")
-		}
+	badges := Badges{
+		ApiToken:     os.Getenv("API_TOKEN"),
+		Organization: os.Getenv("ORGANIZATION"),
+		Repo:         os.Getenv("REPO"),
+		App:          os.Getenv("APP"),
+		Branch:       os.Getenv("BRANCH"),
+		Status:       status,
+		Update:       date,
+		Cronjob:      os.Getenv("CRON"),
+		GraceTime:    graceTime,
+		SlackFailed:  os.Getenv("SLACK_FAILED"),
+		SlackSuccess: os.Getenv("SLACK_SUCCESS"),
+		Msg:          msg,
+		Log:          log,
 	}
 
-	flag.Parse()
+	json, _ := json.Marshal(badges)
+	fmt.Printf("[+] %s\n", string(json))
 
-	if kubeconfig != nil {
-		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
-		if err != nil {
-			panic(err.Error())
+	res, err := http.Post("https://badges.rhems-japan.com/api-update-badge", "application/json", bytes.NewBuffer(json))
+	defer res.Body.Close()
+
+	if err != nil {
+		fmt.Println("[!] " + err.Error())
+		time.Sleep(3 * time.Second)
+		if count < 5 {
+			fmt.Println("[*] Retry")
+			count++
+			postToBadges(status, msg, log, count)
+		} else {
+			fmt.Println("[*] Retry failed")
+			os.Exit(1)
 		}
 	} else {
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			panic(err.Error())
-		}
+		fmt.Println("[*] " + res.Status)
 	}
-
-	clientSet, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	return clientSet
 }

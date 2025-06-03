@@ -48,7 +48,7 @@ COPY --from=create-cert /tmp/create-cert/create-cert /tmp/create-cert
 
 COPY --from=dns_edit_route53 /tmp/dns_edit_route53/dns_edit_route53 /tmp/dns_edit_route53
 
-COPY --from=delete-old-cert /tmp/delete-old-cert/delete-old-cert /tmp/delete-old-cert
+COPY --from=delete-old-cert /tmp/delete-old-cert/delete-old-cert /root/delete-old-cert
 
 COPY --from=go-server /tmp/go-server/server /root/server
 

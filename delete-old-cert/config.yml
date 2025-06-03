@@ -1,0 +1,9 @@
+info:
+  - wildcard_domain: "*.example.com"
+    wildcard_sans:
+      - "*.dev.example.com"
+      - "*.stg.example.com"
+  - domains:
+      - rhems-getssl-1.example.com
+      - rhems-getssl-2.example.com
+      - rhems-getssl-3.example.com
