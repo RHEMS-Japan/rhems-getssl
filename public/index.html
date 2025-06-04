@@ -60,15 +60,16 @@
     <a href="https://www.tencentcloud.com/" target="_blank"><img src="img/Tencent.png" alt="Tencent Cloud" width="30" height="30"></a>
 </div>
 
-<pre><code><h2>使用方法 DNS-01 チャレンジの場合</h2>
+<h2>使用方法 DNS-01 チャレンジの場合</h2>
 
-DNS-01 チャレンジ(DNSのTXTレコードによる認証)を使用する場合は以下の手順に従ってください。
-また、DNS-01 チャレンジではWildcard証明書の取得が可能です。 Wildcard証明書を取得、更新するモードでは証明書の同期も行われます。
-今のところDNSサービスはAWS Route53のみ対応しています。
-その他詳細はgithubのREADMEを参照してください。
+<p>DNS-01 チャレンジ(DNSのTXTレコードによる認証)を使用する場合は以下の手順に従ってください。
+<br>また、DNS-01 チャレンジではWildcard証明書の取得が可能です。 Wildcard証明書を取得、更新するモードでは証明書の同期も行われます。
+<br>今のところDNSサービスはAWS Route53のみ対応しています。
+<br>その他詳細はgithubのREADMEを参照してください。</p>
 
 <h3>1. 準備</h3>
-dns-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgesの各種変数を設定してください。
+<p>dns-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgesの各種変数を設定してください。</p>
+<code><pre>
 # 一部抜粋
 spec:
   timeZone: Asia/Tokyo
@@ -150,8 +151,10 @@ spec:
                   value: __SLACK_FAILED__ # slackの通知先
                 - name: SLACK_SUCCESS
                   value: __SLACK_SUCCESS__ # slackの通知先
+</code></pre>
 
-dns-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。
+<p>dns-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。</p>
+<code><pre>
 # tencentの場合
 info:
   - wildcard_domain: "*.test-getssl.example.com"
@@ -190,9 +193,11 @@ info:
         ingress_name: rhems-getssl-ingress-2
       - namespace: application-3
         ingress_name: rhems-getssl-ingress-3
+</code></pre>
 
-dns-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
-Tencentの場合でもRoute53にドメインを登録するためにAWSのKey/Secが必要です。
+<p>dns-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
+<br>Tencentの場合でもRoute53にドメインを登録するためにAWSのKey/Secが必要です。</p>
+<code><pre>
 # tencentの場合
 apiVersion: v1
 kind: Secret
@@ -219,8 +224,10 @@ stringData:
   AWS_SECRET_ACCESS_KEY: __AWS_SECRET_ACCESS_KEY__ # AWSのシークレットキー
   AWS_DEFAULT_REGION: __AWS_DEFAULT_REGION__ # AWSのリージョン
   AWS_DEFAULT_OUTPUT: json # AWSの出力形式
+</code></pre>
 
-dns-kubernetes/rbac.ymlにて各種権限を設定してください。
+<p>dns-kubernetes/rbac.ymlにて各種権限を設定してください。</p>
+<code><pre>
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -238,22 +245,30 @@ subjects:
   - name: getssl-job
     kind: ServiceAccount
     namespace: rhems-getssl # namespace名
+</code></pre>
 
-dns-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。
+<p>dns-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。</p>
+<code><pre>
 # 一部抜粋
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: rhems-getssl # namespace名
+</code></pre>
 
 <h3>2. デプロイ</h3>
-dns-kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。
+<p>dns-kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。</p>
+<code><pre>
 $ kubectl kustomize .
+</code></pre>
 
-問題が無ければkubectl applyコマンドを実行してください。
+<p>問題が無ければkubectl applyコマンドを実行してください。</p>
+<code><pre>
 $ kubectl apply -k .
+</code></pre>
 
 <h3>3. 確認</h3>
-Cronjobを手動で実行しエラー無く完了するかどうか確認を行って下さい。
+<p>Cronjobを手動で実行しエラー無く完了するかどうか確認を行って下さい。</p>
+<code><pre>
 $ kubectl get cronjob
 NAME           SCHEDULE    SUSPEND   ACTIVE   LAST SCHEDULE   AGE
 rhems-getssl   0 0 * * *   False     0        <none>          8m34s
@@ -264,17 +279,20 @@ NAME                               READY   STATUS      RESTARTS   AGE
 rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
 </code></pre>
 
-<code><pre><h2>使用方法 HTTP-01 チャレンジの場合</h2>
-HTTP-01 チャレンジ(HTTPアクセスによるトークン認証)を使用する場合は以下の手順に従ってください。
-なお、制約として下記にご注意ください。
+<h2>使用方法 HTTP-01 チャレンジの場合</h2>
+<p>HTTP-01 チャレンジ(HTTPアクセスによるトークン認証)を使用する場合は以下の手順に従ってください。
+<br>なお、制約として下記にご注意ください。</p>
+<code><pre>
 - 取得予定のドメインをhostコマンドで解決可能であること。
 - 80番ポートが外部からアクセス可能であること。 HTTPSリダイレクトも可。
 - 通常の証明書のみが取得可能。ワイルドカード証明書は取得不可。
 - GoサーバーとCronJobのPodが取得したいドメインでアクセス可能なIngressと同じNamespaceに存在していること。
+</pre></code>
 
 <h3>1. 準備</h3>
 
-http-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgesの各種変数を設定してください。
+<p>http-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgesの各種変数を設定してください。</p>
+<code><pre>
 # 一部抜粋
 spec:
   timeZone: Asia/Tokyo
@@ -354,8 +372,10 @@ spec:
                   value: __SLACK_FAILED__ # slackの通知先
                 - name: SLACK_SUCCESS
                   value: __SLACK_SUCCESS__ # slackの通知先
+</code></pre>
 
-http-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。
+<p>http-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。</p>
+<code><pre>
 # tencentの場合
 info:
   - namespace: application-1 # namespace名
@@ -385,8 +405,10 @@ info:
     ingress_name: test-getssl-ingress-3
     domains:
       - test-getssl-3.example.com
+</code></pre>
 
-http-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
+<p>http-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。</p>
+<code><pre>
 apiVersion: v1
 kind: Secret
 metadata:
@@ -408,8 +430,10 @@ stringData:
   TENCENTCLOUD_SECRET_ID: "__TENCENTCLOUD_SECRET_ID__"
   TENCENTCLOUD_SECRET_KEY: "__TENCETCLOUD_SECRET_KEY__"
   TENCENTCLOUD_REGION: "__TENCENTCLOUD_REGION__"
+</code></pre>
 
-http-kubernetes/rbac.ymlにて各種権限を設定してください。
+<p>http-kubernetes/rbac.ymlにて各種権限を設定してください。</p>
+<code><pre>
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -427,22 +451,30 @@ subjects:
   - name: getssl-job
     kind: ServiceAccount
     namespace: application-1 # namespace名
+</code></pre>
 
-http-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。
+<p>http-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。</p>
+<code><pre>
 # 一部抜粋
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: application-1 # namespace名
+</code></pre>
 
 <h3>2. デプロイ</h3>
 
-http-kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。
+<p>http-kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。</p>
+<code><pre>
 $ kubectl kustomize .
+</code></pre>
 
-問題が無ければkubectl applyコマンドを実行してください。
+<p>問題が無ければkubectl applyコマンドを実行してください。</p>
+<code><pre>
 $ kubectl apply -k .
+</code></pre>
 
-取得したいドメインを受け持つIngressより/.well-known/acme-challenge/以下のリクエストをPodに転送するように設定してください。
+<p>取得したいドメインを受け持つIngressより/.well-known/acme-challenge/以下のリクエストをPodに転送するように設定してください。</p>
+<code><pre>
 # awsの場合
 spec:
   ingressClassName: alb
@@ -484,24 +516,30 @@ spec:
                 name: application-svc
                 port:
                   number: 80
+</code></pre>
 
 <h3>3. 確認</h3>
 
-GoサーバーPodが正常に起動しているか確認してください。
+<p>GoサーバーPodが正常に起動しているか確認してください。</p>
+<code><pre>
 $ kubectl get pod
 NAME                              READY   STATUS      RESTARTS   AGE
 rhems-getssl-go-dd7f89db-pczsw    1/1     Running     0          54m
+</code></pre>
 
-初回起動時は/.well-known/acme-challenge/dummyが外部アクセスより確認できるようになっております。
-証明書を取得したいドメイン+/.well-known/acme-challenge/dummyで正しく取得できるかどうか確認を行ってください。
+<p>初回起動時は/.well-known/acme-challenge/dummyが外部アクセスより確認できるようになっております。
+<br>証明書を取得したいドメイン+/.well-known/acme-challenge/dummyで正しく取得できるかどうか確認を行ってください。</p>
+<code><pre>
 $ curl http://test-getssl.example.com/.well-known/acme-challenge/dummy
 dummy
 $ curl http://test-getssl-2.example.com/.well-known/acme-challenge/dummy
 dummy
 $ curl http://test-getssl-3.example.com/.well-known/acme-challenge/dummy
 dummy
+</code></pre>
 
-Cronjobを手動で実行しエラー無く完了するかどうか確認を行って下さい。
+<p>Cronjobを手動で実行しエラー無く完了するかどうか確認を行って下さい。</p>
+<code><pre>
 $ kubectl get cronjob
 NAME           SCHEDULE    SUSPEND   ACTIVE   LAST SCHEDULE   AGE
 rhems-getssl   0 0 * * *   False     0        <none>          8m34s
