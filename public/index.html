@@ -69,7 +69,7 @@
 
 <h3>1. 準備</h3>
 <p>dns-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgesの各種変数を設定してください。</p>
-<code><pre>
+<pre><code>
 # 一部抜粋
 spec:
   timeZone: Asia/Tokyo
@@ -154,7 +154,7 @@ spec:
 </code></pre>
 
 <p>dns-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。</p>
-<code><pre>
+<pre><code>
 # tencentの場合
 info:
   - wildcard_domain: "*.test-getssl.example.com"
@@ -197,7 +197,7 @@ info:
 
 <p>dns-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。
 <br>Tencentの場合でもRoute53にドメインを登録するためにAWSのKey/Secが必要です。</p>
-<code><pre>
+<pre><code>
 # tencentの場合
 apiVersion: v1
 kind: Secret
@@ -227,7 +227,7 @@ stringData:
 </code></pre>
 
 <p>dns-kubernetes/rbac.ymlにて各種権限を設定してください。</p>
-<code><pre>
+<pre><code>
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -248,7 +248,7 @@ subjects:
 </code></pre>
 
 <p>dns-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。</p>
-<code><pre>
+<pre><code>
 # 一部抜粋
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -257,18 +257,18 @@ namespace: rhems-getssl # namespace名
 
 <h3>2. デプロイ</h3>
 <p>dns-kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。</p>
-<code><pre>
+<pre><code>
 $ kubectl kustomize .
 </code></pre>
 
 <p>問題が無ければkubectl applyコマンドを実行してください。</p>
-<code><pre>
+<pre><code>
 $ kubectl apply -k .
 </code></pre>
 
 <h3>3. 確認</h3>
 <p>Cronjobを手動で実行しエラー無く完了するかどうか確認を行って下さい。</p>
-<code><pre>
+<pre><code>
 $ kubectl get cronjob
 NAME           SCHEDULE    SUSPEND   ACTIVE   LAST SCHEDULE   AGE
 rhems-getssl   0 0 * * *   False     0        <none>          8m34s
@@ -281,8 +281,7 @@ rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
 
 <h2>使用方法 HTTP-01 チャレンジの場合</h2>
 <p>HTTP-01 チャレンジ(HTTPアクセスによるトークン認証)を使用する場合は以下の手順に従ってください。
-<br>なお、制約として下記にご注意ください。</p>
-<code><pre>
+<br>なお、制約として下記にご注意ください。</p><code></code>
 - 取得予定のドメインをhostコマンドで解決可能であること。
 - 80番ポートが外部からアクセス可能であること。 HTTPSリダイレクトも可。
 - 通常の証明書のみが取得可能。ワイルドカード証明書は取得不可。
@@ -292,7 +291,7 @@ rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
 <h3>1. 準備</h3>
 
 <p>http-kubernetes/cronjob.ymlにてクラウドサービスやrhems-badgesの各種変数を設定してください。</p>
-<code><pre>
+<pre><code>
 # 一部抜粋
 spec:
   timeZone: Asia/Tokyo
@@ -375,7 +374,7 @@ spec:
 </code></pre>
 
 <p>http-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。</p>
-<code><pre>
+<pre><code>
 # tencentの場合
 info:
   - namespace: application-1 # namespace名
@@ -408,7 +407,7 @@ info:
 </code></pre>
 
 <p>http-kubernetes/env.ymlにて各種クラウドサービス接続用のKeyやSecretを設定してください。</p>
-<code><pre>
+<pre><code>
 apiVersion: v1
 kind: Secret
 metadata:
@@ -433,7 +432,7 @@ stringData:
 </code></pre>
 
 <p>http-kubernetes/rbac.ymlにて各種権限を設定してください。</p>
-<code><pre>
+<pre><code>
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -454,7 +453,7 @@ subjects:
 </code></pre>
 
 <p>http-kubernetes/kustomization.ymlにてデプロイするnamespaceを設定してください。</p>
-<code><pre>
+<pre><code>
 # 一部抜粋
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -464,17 +463,17 @@ namespace: application-1 # namespace名
 <h3>2. デプロイ</h3>
 
 <p>http-kubernetesディレクトリにてkubectl kustomizeコマンドを実行し内容に問題が無いかどうか確認してください。</p>
-<code><pre>
+<pre><code>
 $ kubectl kustomize .
 </code></pre>
 
 <p>問題が無ければkubectl applyコマンドを実行してください。</p>
-<code><pre>
+<pre><code>
 $ kubectl apply -k .
 </code></pre>
 
 <p>取得したいドメインを受け持つIngressより/.well-known/acme-challenge/以下のリクエストをPodに転送するように設定してください。</p>
-<code><pre>
+<pre><code>
 # awsの場合
 spec:
   ingressClassName: alb
@@ -521,7 +520,7 @@ spec:
 <h3>3. 確認</h3>
 
 <p>GoサーバーPodが正常に起動しているか確認してください。</p>
-<code><pre>
+<pre><code>
 $ kubectl get pod
 NAME                              READY   STATUS      RESTARTS   AGE
 rhems-getssl-go-dd7f89db-pczsw    1/1     Running     0          54m
@@ -529,7 +528,7 @@ rhems-getssl-go-dd7f89db-pczsw    1/1     Running     0          54m
 
 <p>初回起動時は/.well-known/acme-challenge/dummyが外部アクセスより確認できるようになっております。
 <br>証明書を取得したいドメイン+/.well-known/acme-challenge/dummyで正しく取得できるかどうか確認を行ってください。</p>
-<code><pre>
+<pre><code>
 $ curl http://test-getssl.example.com/.well-known/acme-challenge/dummy
 dummy
 $ curl http://test-getssl-2.example.com/.well-known/acme-challenge/dummy
@@ -539,7 +538,7 @@ dummy
 </code></pre>
 
 <p>Cronjobを手動で実行しエラー無く完了するかどうか確認を行って下さい。</p>
-<code><pre>
+<pre><code>
 $ kubectl get cronjob
 NAME           SCHEDULE    SUSPEND   ACTIVE   LAST SCHEDULE   AGE
 rhems-getssl   0 0 * * *   False     0        <none>          8m34s
@@ -549,6 +548,19 @@ $ kubectl get pod
 NAME                               READY   STATUS      RESTARTS   AGE
 rhems-getssl-go-6559dbf796-ssz4z   1/1     Running     0          5m50s
 rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
+</code></pre>
+
+<h2>create-certのオプション</h2>
+
+<p>create-certの実行オプションは以下の通りです。</p>
+<pre><code>
+- -f: configファイルのパスを指定 デフォルトは"./config.yml"
+- -c: 証明書を適用するクラウドサービスを指定 デフォルトは"aws" 入力値は"aws"、"tencent"
+- -i: 初期処理を行うかどうかを指定 デフォルトは"false" 入力値は"true"、"false"
+- --force: 強制的に証明書を更新するかどうかを指定 デフォルトは"false" 入力値は"true"、"false"
+- --update-before-day: 証明書の更新期限を指定 デフォルトは"3" 入力値は"0"以上の整数
+- --lets-encrypt-environment: Let's EncryptのCA環境を指定 デフォルトは"production" 入力値は"staging"、"production"
+- --dns-validation: DNS-01 チャレンジを使用するかどうかを指定 デフォルトは"false" 入力値は"true"、"false"
 </code></pre>
 
 <h2 align="center">フロー図</h2>
