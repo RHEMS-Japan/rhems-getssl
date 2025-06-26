@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: delete-old-cert
+
+resources:
+  - cronjob.yml
+  - env.yml
+
+images:
+  - name: rhems-getssl
+    newName: rhemsjapan/rhems-getssl
+    newTag: latest
+
+configMapGenerator:
+  - name: config
+    files:
+      - config.yml

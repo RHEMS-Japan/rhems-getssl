@@ -1,72 +1,21 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: rhems-getssl
+  name: delete-old-cert
   labels:
-    app: rhems-getssl
+    app: delete-old-cert
 spec:
   timeZone: Asia/Tokyo
-  schedule: "0 0 * * *"
+  schedule: "0 0 * * 1"
   jobTemplate:
     spec:
       template:
         metadata:
           labels:
-            app: rhems-getssl
+            app: delete-old-cert
         spec:
-          serviceAccountName: getssl-job
-          initContainers:
-            - name: init-getssl
-              image: rhems-getssl
-              imagePullPolicy: IfNotPresent
-              workingDir: /tmp
-              command:
-                - ./create-cert
-              args:
-                - '-i=true'
-                - '-f'
-                - '/root/config.yml'
-                - '-dns-validation=true'
-              resources:
-                limits:
-                  cpu: 250m
-                  memory: 256Mi
-                requests:
-                  cpu: 250m
-                  memory: 256Mi
-              env:
-                - name: TZ
-                  value: Asia/Tokyo
-                - name: POD_NAMESPACE
-                  valueFrom:
-                    fieldRef:
-                      fieldPath: metadata.namespace
-                - name: API_TOKEN
-                  value: __BADGE_API_TOKEN__
-                - name: ORGANIZATION
-                  value: __ORGANIZATION__
-                - name: REPO
-                  value: __REPO__
-                - name: APP
-                  value: __APP__
-                - name: BRANCH
-                  value: __BRANCH__
-                - name: CRON
-                  value: "0 15 * * *"
-                - name: GRACE_TIME
-                  value: "10"
-                - name: SLACK_FAILED
-                  value: __SLACK_FAILED__
-                - name: SLACK_SUCCESS
-                  value: __SLACK_SUCCESS__
-              volumeMounts:
-                - name: root
-                  mountPath: /root
-                - name: config
-                  mountPath: /root/config.yml
-                  subPath: config.yml
           containers:
-            - name: rhems-getssl
+            - name: delete-old-cert
               image: rhems-getssl
               imagePullPolicy: IfNotPresent
               workingDir: /root
@@ -75,7 +24,6 @@ spec:
               args:
                 - '-c'
                 - 'aws'
-                - '-dns-validation=true'
               resources:
                 limits:
                   cpu: 250m
@@ -95,13 +43,13 @@ spec:
                 - name: ORGANIZATION
                   value: __ORGANIZATION__
                 - name: REPO
-                  value: __REPO__
+                  value: delete-old-cert
                 - name: APP
-                  value: __APP__
+                  value: delete-old-cert
                 - name: BRANCH
-                  value: __BRANCH__
+                  value: delete-old-cert
                 - name: CRON
-                  value: "0 15 * * *"
+                  value: "0 15 * * 1"
                 - name: GRACE_TIME
                   value: "10"
                 - name: SLACK_FAILED

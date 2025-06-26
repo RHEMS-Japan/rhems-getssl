@@ -1,17 +1,19 @@
 info:
   - wildcard_domain: "*.example.com"
     wildcard_sans:
-      - "*.test.example.com"
-      - "*.mail.example.com"
+      - "*.dev.example.com"
+      - "*.stg.example.com"
     check_domains:
-      - "test-getssl.example.com"
+      - "rhems-getssl.example.com"
+      - "rhems-getssl.dev.example.com"
+      - "rhems-getssl.stg.example.com"
     secrets:
-      - namespace: application-1
-        secret_name: application-cert-id
-      - namespace: application-2
-        secret_name: application-cert-id-2
-      - namespace: application-3
-        secret_name: application-cert-id-3
+      - namespace: application
+        secret_name: application-cert
+      - namespace: application-dev
+        secret_name: application-2-cert
+      - namespace: application-stg
+        secret_name: application-3-cert
     clbs:
       - load_balancer_id: lb-12345678
         listener_ids:
