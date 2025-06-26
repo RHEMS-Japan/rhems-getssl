@@ -15,7 +15,7 @@
 
 ## create-certの実行オプション
 
-create-cert.goの実行オプションは以下の通りです。
+create-certの実行オプションは以下の通りです。
 
 - `-f`: configファイルのパスを指定 デフォルトは`./config.yml`
 - `-c`: 証明書を適用するクラウドサービスを指定 デフォルトは`aws` 入力値は`aws`、`tencent`
