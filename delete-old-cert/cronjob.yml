@@ -20,7 +20,7 @@ spec:
               imagePullPolicy: IfNotPresent
               workingDir: /root
               command:
-                - ./create-cert
+                - ./delete-old-cert
               args:
                 - '-c'
                 - 'aws'
