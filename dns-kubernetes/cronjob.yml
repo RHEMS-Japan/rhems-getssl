@@ -24,8 +24,6 @@ spec:
                 - ./create-cert
               args:
                 - '-i=true'
-                - '-f'
-                - '/root/config.yml'
                 - '-dns-validation=true'
               resources:
                 limits:
