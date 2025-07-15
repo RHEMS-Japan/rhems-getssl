@@ -153,6 +153,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	// configのwildcardドメイン重複チェック
+	isOk, duplicateDomains := duplicateCheck(config)
+	if isOk {
+		fmt.Println("No duplicate wildcard domains found.")
+	} else {
+		fmt.Println("Duplicate wildcard domains found:", duplicateDomains)
+		postToBadges(os.Getenv("BRANCH"), false, "Duplicate wildcard domains found: "+duplicateDomains, "duplicate wildcard domains", 0)
+		os.Exit(1)
+	}
+
 	// Kubernetes Clientの初期化
 	clientSet := initKubeClient()
 
@@ -340,6 +350,27 @@ func initKubeClient() *kubernetes.Clientset {
 	}
 
 	return clientSet
+}
+
+// configのwildcardドメイン重複チェック
+func duplicateCheck(config Config) (bool, string) {
+	var wildcardDomains = make(map[string]bool)
+	duplicateDomains := ""
+
+	for _, info := range config.Info {
+		if info.WildcardDomain != "" {
+			if _, exists := wildcardDomains[info.WildcardDomain]; exists {
+				duplicateDomains += info.WildcardDomain + ", "
+			}
+			wildcardDomains[info.WildcardDomain] = true
+		}
+	}
+
+	if duplicateDomains != "" {
+		return false, duplicateDomains[:len(duplicateDomains)-2]
+	} else {
+		return true, ""
+	}
 }
 
 // 証明書アップロード処理
