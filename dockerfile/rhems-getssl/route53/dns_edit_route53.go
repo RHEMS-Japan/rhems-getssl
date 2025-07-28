@@ -26,12 +26,12 @@ func main() {
 	switch basename {
 	case "dns_add_route53":
 		fmt.Println("dns_add_route53")
-		edit_route53("UPSERT", fqdn, challenge)
-		waitAvaliable(fqdn, challenge)
+		editRoute53("UPSERT", fqdn, challenge)
+		waitAvailable(fqdn, challenge)
 		break
 	case "dns_remove_route53":
 		fmt.Println("dns_remove_route53")
-		edit_route53("DELETE", fqdn, challenge)
+		editRoute53("DELETE", fqdn, challenge)
 		break
 	default:
 		fmt.Println("Unknown basename")
@@ -39,7 +39,7 @@ func main() {
 	}
 }
 
-func edit_route53(action string, fqdn string, challenge string) {
+func editRoute53(action string, fqdn string, challenge string) {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		fmt.Println("unable to load SDK config, ", err)
@@ -120,7 +120,7 @@ func edit_route53(action string, fqdn string, challenge string) {
 	fmt.Println(*output.ChangeInfo.SubmittedAt)
 }
 
-func waitAvaliable(fqdn string, challenge string) {
+func waitAvailable(fqdn string, challenge string) {
 	for {
 		texts, err := net.LookupTXT(fmt.Sprintf("_acme-challenge.%s", fqdn))
 		if err == nil {

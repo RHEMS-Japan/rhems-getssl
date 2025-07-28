@@ -66,8 +66,9 @@ type Info struct { // 証明書情報
 }
 
 type Config struct { // yamlファイルの構造
-	Info                 []Info `yaml:"info"`
-	ServerDeploymentName string `yaml:"server_deployment_name"`
+	Info                         []Info `yaml:"info"`
+	ServerDeploymentName         string `yaml:"server_deployment_name"`
+	GcloudServiceAccountJsonName string `yaml:"gcloud_service_account_json_name"`
 }
 
 type Badges struct { // RHEMS Badges API 用
@@ -111,6 +112,7 @@ var force bool                    // -force flag
 var updateBeforeDay int           // -update-before-day flag
 var letsEncryptEnvironment string // -lets-encrypt-environment flag
 var dnsValidation bool            // -dns-validation flag
+var dnsService string             // DNSサービス名（Route53 or cloud-dns）
 
 func main() {
 	// 実行フラグ取得
@@ -121,6 +123,7 @@ func main() {
 	flag.IntVar(&updateBeforeDay, "update-before-day", 3, "Update before date. default '-update-before-day 3'")
 	flag.StringVar(&letsEncryptEnvironment, "lets-encrypt-environment", "production", "Let's Encrypt environment production or staging. default '-lets-encrypt-environment production'")
 	flag.BoolVar(&dnsValidation, "dns-validation", false, "DNS validation. default '-dns-validation=false'")
+	flag.StringVar(&dnsService, "dns-service", "route53", "DNS service name (route53 or cloud-dns). default '-dns-service route53'")
 	flag.Parse()
 
 	// -update-before-day flagの値チェック
@@ -308,9 +311,15 @@ func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 			replaceStringInFile("/root/.getssl/getssl.cfg", "CA=\"https://acme-staging-v02.api.letsencrypt.org\"", "CA=\"https://acme-v02.api.letsencrypt.org\"")
 		}
 		replaceStringInFile("/root/.getssl/getssl.cfg", "#VALIDATE_VIA_DNS=\"true\"", "VALIDATE_VIA_DNS=\"true\"")
-		replaceStringInFile("/root/.getssl/getssl.cfg", "#VALIDATE_VIA_DNS=\"true\"", "VALIDATE_VIA_DNS=\"true\"")
-		replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_ADD_COMMAND=", "DNS_ADD_COMMAND=\"/root/dns_add_route53\"")
-		replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_DEL_COMMAND=", "DNS_DEL_COMMAND=\"/root/dns_remove_route53\"")
+
+		if dnsService == "route53" {
+			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_ADD_COMMAND=", "DNS_ADD_COMMAND=\"/root/dns_add_route53\"")
+			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_DEL_COMMAND=", "DNS_DEL_COMMAND=\"/root/dns_remove_route53\"")
+		} else if dnsService == "cloud-dns" {
+			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_ADD_COMMAND=", fmt.Sprintf("DNS_ADD_COMMAND=\"/root/dns_add_google_cloud_dns %s\"", config.GcloudServiceAccountJsonName))
+			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_DEL_COMMAND=", fmt.Sprintf("DNS_DEL_COMMAND=\"/root/dns_remove_google_cloud_dns %s\"", config.GcloudServiceAccountJsonName))
+		}
+
 	}
 
 	os.Exit(0)

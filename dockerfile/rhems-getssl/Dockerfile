@@ -12,6 +12,13 @@ COPY route53/dns_edit_route53.go ./
 RUN go mod download
 RUN go build -ldflags="-w -s" -o ./dns_edit_route53 ./dns_edit_route53.go
 
+FROM golang:1.24.3-alpine3.21 AS dns_edit_google_cloud_dns
+WORKDIR /tmp/dns_edit_google_cloud_dns
+COPY google-cloud-dns/go.mod google-cloud-dns/go.sum ./
+COPY google-cloud-dns/dns_edit_google_cloud_dns.go ./
+RUN go mod download
+RUN go build -ldflags="-w -s" -o ./dns_edit_google_cloud_dns ./dns_edit_google_cloud_dns.go
+
 FROM golang:1.24.3-alpine3.21 AS go-server
 WORKDIR /tmp/go-server
 COPY go-server/go.mod ./
@@ -47,6 +54,8 @@ RUN mkdir -p /var/www/html/.well-known/acme-challenge && chmod 777 /var/www/html
 COPY --from=create-cert /tmp/create-cert/create-cert /tmp/create-cert
 
 COPY --from=dns_edit_route53 /tmp/dns_edit_route53/dns_edit_route53 /tmp/dns_edit_route53
+
+COPY --from=dns_edit_google_cloud_dns /tmp/dns_edit_google_cloud_dns/dns_edit_google_cloud_dns /tmp/dns_edit_google_cloud_dns
 
 COPY --from=delete-old-cert /tmp/delete-old-cert/delete-old-cert /root/delete-old-cert
 
