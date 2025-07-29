@@ -112,7 +112,7 @@ var force bool                    // -force flag
 var updateBeforeDay int           // -update-before-day flag
 var letsEncryptEnvironment string // -lets-encrypt-environment flag
 var dnsValidation bool            // -dns-validation flag
-var dnsService string             // DNSサービス名（Route53 or cloud-dns）
+var dnsService string             // DNSサービス名（Route53 or gcloud-dns）
 
 func main() {
 	// 実行フラグ取得
@@ -123,7 +123,7 @@ func main() {
 	flag.IntVar(&updateBeforeDay, "update-before-day", 3, "Update before date. default '-update-before-day 3'")
 	flag.StringVar(&letsEncryptEnvironment, "lets-encrypt-environment", "production", "Let's Encrypt environment production or staging. default '-lets-encrypt-environment production'")
 	flag.BoolVar(&dnsValidation, "dns-validation", false, "DNS validation. default '-dns-validation=false'")
-	flag.StringVar(&dnsService, "dns-service", "route53", "DNS service name (route53 or cloud-dns). default '-dns-service route53'")
+	flag.StringVar(&dnsService, "dns-service", "route53", "DNS service name (route53 or gcloud-dns). default '-dns-service route53'")
 	flag.Parse()
 
 	// -update-before-day flagの値チェック
@@ -315,7 +315,7 @@ func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 		if dnsService == "route53" {
 			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_ADD_COMMAND=", "DNS_ADD_COMMAND=\"/root/dns_add_route53\"")
 			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_DEL_COMMAND=", "DNS_DEL_COMMAND=\"/root/dns_remove_route53\"")
-		} else if dnsService == "cloud-dns" {
+		} else if dnsService == "gcloud-dns" {
 			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_ADD_COMMAND=", fmt.Sprintf("DNS_ADD_COMMAND=\"/root/dns_add_google_cloud_dns %s\"", config.GcloudServiceAccountJsonName))
 			replaceStringInFile("/root/.getssl/getssl.cfg", "#DNS_DEL_COMMAND=", fmt.Sprintf("DNS_DEL_COMMAND=\"/root/dns_remove_google_cloud_dns %s\"", config.GcloudServiceAccountJsonName))
 		}
