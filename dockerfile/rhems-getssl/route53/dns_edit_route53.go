@@ -126,7 +126,7 @@ func waitAvailable(fqdn string, challenge string) {
 		if err == nil {
 			for _, addr := range texts {
 				fmt.Println(addr)
-				if addr == fmt.Sprintf("\"%s\"", challenge) {
+				if addr == fmt.Sprintf("%s", challenge) {
 					fmt.Println("DNS is available")
 					os.Exit(0)
 				}
