@@ -23,6 +23,7 @@ create-certの実行オプションは以下の通りです。
 - `-f`: configファイルのパスを指定 デフォルトは`./config.yml`
 - `-lets-encrypt-environment`: Let's EncryptのCA環境を指定 デフォルトは`production` 入力値は`staging`、`production`
 - `-dns-validation`: DNS-01 チャレンジを使用するかどうかを指定 デフォルトは`false` 入力値は`true`、`false` InitContainer、Containerで同じ値を指定してください。
+- `-dns-service`: DNS-01 チャレンジを使用する場合のDNSサービスを指定 デフォルトは`route53` 入力値は`route53`、`gcloud-dns`
 
 ### Containerでの実行オプション
 

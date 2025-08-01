@@ -64,7 +64,7 @@
 
 <p>DNS-01 チャレンジ(DNSのTXTレコードによる認証)を使用する場合は以下の手順に従ってください。
 <br>また、DNS-01 チャレンジではWildcard証明書の取得が可能です。 Wildcard証明書を取得、更新するモードでは証明書の同期も行われます。
-<br>今のところDNSサービスはAWS Route53のみ対応しています。
+<br>今のところDNSサービスはAWS Route53、Google Cloud DNSに対応しています。
 <br>その他詳細はgithubのREADMEを参照してください。</p>
 
 <h3>1. 準備</h3>
@@ -89,6 +89,7 @@ spec:
                 - '-f'
                 - '/root/config.yml'
                 - '-dns-validation=true' # DNS-01 チャレンジのためこのオプションを追加してください。
+                - '-dns-service=route53' # DNSサービスを指定します。デフォルトは"route53"です。"route53"、"gcloud-dns"のいずれかを指定してください。
               env:
                 - name: TZ
                   value: Asia/Tokyo
@@ -156,6 +157,7 @@ spec:
 <p>dns-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。</p>
 <pre><code>
 # tencentの場合
+gcloud_service_account_json_name: /root/abcd-123456789.json # -dns-service=gcloud-dnsを指定する場合はGoogle CloudのサービスアカウントのJSONファイルを指定してください。
 info:
   - wildcard_domain: "*.test-getssl.example.com"
     wildcard_sans:
@@ -178,6 +180,7 @@ info:
         region: ap-tokyo
 ---
 # awsの場合
+gcloud_service_account_json_name: /root/abcd-123456789.json # -dns-service=gcloud-dnsを指定する場合はGoogle CloudのサービスアカウントのJSONファイルを指定してください。
 info:
   - wildcard_domain: "*.test-getssl.example.com"
     wildcard_sans:

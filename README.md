@@ -2,7 +2,7 @@
 
 [srvrco/getssl](https://github.com/srvrco/getssl?tab=readme-ov-file)スクリプトを使用し各種クラウドKubernetes環境にてLet's Encrypt発行の無料証明書の取得・管理・更新を自動で行うシステムです。
 HTTP-01 チャレンジとDNS-01 チャレンジの両方に対応しています。
-また、DNS-01 チャレンジの場合は現在のところAWS Route53のみ対応しています。
+また、DNS-01 チャレンジの場合は現在のところAWS Route53、Google Cloud DNSに対応しています。
 
 ## 構成
 
@@ -287,7 +287,7 @@ rhems-getssl-manual-123456-7hf6c   1/1     Running     0          18s
 DNS-01 チャレンジ(DNSのTXTレコードによる認証)を使用する場合は以下の手順に従ってください。
 また、Wildcard証明書の取得が可能です。 Wildcard証明書を取得、更新するモードでは証明書の同期も行われます。
 なお、制約として下記にご注意ください。
-- 今のところDNSサービスはAWS Route53のみ対応しています。
+- 今のところDNSサービスはAWS Route53, Google Cloud DNSに対応しています。
 
 ### 1. 準備
 
@@ -312,6 +312,7 @@ spec:
                 - '-f'
                 - '/root/config.yml'
                 - '-dns-validation=true' # DNS-01 チャレンジのためこのオプションを追加してください。
+                - '-dns-service=route53' # DNSサービスを指定します。
               env:
                 - name: TZ
                   value: Asia/Tokyo
@@ -379,6 +380,7 @@ spec:
 dns-kubernetes/config.ymlにて取得したいドメインや書き換え対象のsecret、ingress名などを設定してください。
 ```yaml
 # tencentの場合
+gcloud_service_account_json_name: /root/abcd-123456789.json # -dns-service=gcloud-dnsを指定する場合はGoogle CloudのサービスアカウントのJSONファイルを指定してください。
 info:
   - wildcard_domain: "*.test-getssl.example.com"
     wildcard_sans:
@@ -401,6 +403,7 @@ info:
         region: ap-tokyo
 ---
 # awsの場合
+gcloud_service_account_json_name: /root/abcd-123456789.json # -dns-service=gcloud-dnsを指定する場合はGoogle CloudのサービスアカウントのJSONファイルを指定してください。
 info:
   - wildcard_domain: "*.test-getssl.example.com"
     wildcard_sans:
