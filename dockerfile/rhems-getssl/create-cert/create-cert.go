@@ -300,7 +300,13 @@ func initGetssl(config Config, clientSet *kubernetes.Clientset) {
 				}
 				sans = strings.TrimSuffix(sans, ",")
 				wwwDomain := "www." + strings.TrimPrefix(info.WildcardDomain, "*.")
-				replaceStringInFile("/root/.getssl/"+info.WildcardDomain+"/getssl.cfg", "#SANS=\""+wwwDomain+"\"", "SANS=\""+sans+"\"")
+				originalDomain := strings.TrimPrefix(info.WildcardDomain, "*.")
+				if checkSSLValidation(originalDomain) {
+					replaceStringInFile("/root/.getssl/"+info.WildcardDomain+"/getssl.cfg", "#SANS=\""+originalDomain+"\"", "SANS=\""+sans+"\"")
+				} else {
+					replaceStringInFile("/root/.getssl/"+info.WildcardDomain+"/getssl.cfg", "#SANS=\""+wwwDomain+"\"", "SANS=\""+sans+"\"")
+				}
+
 			}
 		}
 	}
@@ -831,6 +837,18 @@ func checkCertValidation(url string, domain string) (bool, string) {
 	} else {
 		fmt.Println("Certificate needs to be updated")
 		return false, expireJSTDate
+	}
+}
+
+func checkSSLValidation(url string) bool {
+	_, err := http.Get("https://" + url)
+
+	if err != nil {
+		fmt.Println("cert validation error: ", err)
+		return false
+	} else {
+		fmt.Println("cert validation success")
+		return true
 	}
 }
 
