@@ -7,21 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/acm"
-	clb "github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/clb/v20180317"
-	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common"
-	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common/errors"
-	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common/profile"
-	ssl "github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/ssl/v20191205"
-	"gopkg.in/yaml.v2"
 	"io"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/retry"
 	"net/http"
 	"os"
 	"os/exec"
@@ -30,6 +16,21 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/acm"
+	clb "github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/clb/v20180317"
+	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common"
+	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common/errors"
+	"github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/common/profile"
+	ssl "github.com/tencentcloud/tencentcloud-sdk-go-intl-en/tencentcloud/ssl/v20191205"
+	"gopkg.in/yaml.v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 )
 
 type Secret struct { // TKE用Secret 設定
@@ -1027,7 +1028,7 @@ func applyCertToIngress(certId string, domain string, clientSet *kubernetes.Clie
 func appliedCertCheck(checkDomain string, domain string) (bool, string) {
 	status := false
 	expireDate := ""
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 3; i++ {
 		isNotExpireCheck, expireDateCheck := checkCertValidation(checkDomain, domain)
 		expireDate = expireDateCheck
 		if isNotExpireCheck {
@@ -1035,7 +1036,7 @@ func appliedCertCheck(checkDomain string, domain string) (bool, string) {
 			break
 		} else {
 			fmt.Println("Certificate is not applied yet")
-			time.Sleep(10 * time.Second)
+			time.Sleep(2 * time.Second)
 		}
 	}
 	return status, expireDate
