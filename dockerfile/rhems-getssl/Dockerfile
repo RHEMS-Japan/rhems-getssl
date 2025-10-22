@@ -1,11 +1,11 @@
-FROM golang:1.24.3-alpine3.21 AS create-cert
+FROM golang:1.25.3-alpine3.22 AS create-cert
 WORKDIR /tmp/create-cert
 COPY ./create-cert/go.mod ./create-cert/go.sum ./
 COPY ./create-cert/create-cert.go ./create-cert/check-remote-cert.go ./
 RUN go mod download
 RUN go build -ldflags="-w -s" -o ./create-cert ./create-cert.go ./check-remote-cert.go
 
-FROM golang:1.24.3-alpine3.21 AS dns_edit
+FROM golang:1.25.3-alpine3.22 AS dns_edit
 WORKDIR /tmp/dns_edit_route53
 COPY route53/go.mod route53/go.sum ./
 COPY route53/dns_edit_route53.go ./
@@ -18,27 +18,27 @@ COPY google-cloud-dns/dns_edit_google_cloud_dns.go ./
 RUN go mod download
 RUN go build -ldflags="-w -s" -o ./dns_edit_google_cloud_dns ./dns_edit_google_cloud_dns.go
 
-FROM golang:1.24.3-alpine3.21 AS go-server
+FROM golang:1.25.3-alpine3.22 AS go-server
 WORKDIR /tmp/go-server
 COPY go-server/go.mod ./
 COPY go-server/server.go ./
 RUN go mod download
 RUN go build -ldflags="-w -s" -o ./server ./server.go
 
-FROM golang:1.24.3-alpine3.21 AS delete-old-cert
+FROM golang:1.25.3-alpine3.22 AS delete-old-cert
 WORKDIR /tmp/delete-old-cert
 COPY delete-old-cert/go.mod delete-old-cert/go.sum ./
 COPY delete-old-cert/check-remote-cert.go delete-old-cert/delete-old-cert.go ./
 RUN go mod download
 RUN go build -ldflags="-w -s" -o ./delete-old-cert ./delete-old-cert.go ./check-remote-cert.go
 
-FROM alpine:3.21.3 AS kubectl
+FROM alpine:3.22.2 AS kubectl
 WORKDIR /tmp/kubectl
 RUN apk add curl bash
 COPY ./kubectl-install.sh /tmp/kubectl/kubectl-install.sh
 RUN chmod +x kubectl-install.sh && /bin/bash kubectl-install.sh
 
-FROM alpine:3.21.3
+FROM alpine:3.22.2
 
 # Install necessary packages
 RUN apk add --no-cache bind-tools jq unzip sudo curl bash openssl git

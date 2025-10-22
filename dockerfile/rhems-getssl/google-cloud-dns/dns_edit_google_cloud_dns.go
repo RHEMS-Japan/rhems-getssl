@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"google.golang.org/api/dns/v1"
-	"google.golang.org/api/option"
 	"net"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"time"
+
+	"google.golang.org/api/dns/v1"
+	"google.golang.org/api/option"
 )
 
 type GoogleCloudServiceAccount struct {
