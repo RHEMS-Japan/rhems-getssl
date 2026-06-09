@@ -1,6 +1,6 @@
 module main
 
-go 1.24.3
+go 1.26.4
 
 require google.golang.org/api v0.243.0
 
